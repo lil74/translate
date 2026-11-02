@@ -1,0 +1,9 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="24dp">
+    <TextView android:id="@+id/book_title" android:layout_width="match_parent" android:layout_height="wrap_content" style="@style/SectionTitle"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginBottom="16dp" android:text="选一个章节，或从上次停下的地方继续。" style="@style/MutedText"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/continue_reading" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="继续阅读"/>
+    <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"/>
+    <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content" style="@style/MutedText"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/retry" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="重新加载" android:visibility="gone"/>
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:paddingTop="16dp"/>
+</LinearLayout>

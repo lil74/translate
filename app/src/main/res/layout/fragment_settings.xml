@@ -1,0 +1,14 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="舒服地读下去。" style="@style/SectionTitle"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="调整文字和留白，找到自己的节奏。" style="@style/MutedText" android:layout_marginTop="8dp" android:layout_marginBottom="24dp"/>
+        <TextView android:id="@+id/font_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="字号"/>
+        <SeekBar android:id="@+id/font" android:layout_width="match_parent" android:layout_height="48dp" android:max="16" android:contentDescription="正文字号，14 到 30"/>
+        <TextView android:id="@+id/spacing_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="行距" android:layout_marginTop="16dp"/>
+        <SeekBar android:id="@+id/spacing" android:layout_width="match_parent" android:layout_height="48dp" android:max="8" android:contentDescription="行距，1.2 到 2.0 倍"/>
+        <androidx.appcompat.widget.SwitchCompat android:id="@+id/night" android:layout_width="match_parent" android:layout_height="56dp" android:text="夜间模式"/>
+        <TextView android:id="@+id/preview" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:background="@drawable/soft_panel" android:text="A page is already a beginning.
+读一页，就是一个开始。"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/save" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="保存阅读设置"/>
+    </LinearLayout>
+</ScrollView>

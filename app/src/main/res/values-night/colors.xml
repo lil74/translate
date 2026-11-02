@@ -1,0 +1,6 @@
+<resources>
+    <color name="primary">#A6D0BA</color><color name="background">#171F1C</color>
+    <color name="surface">#222D27</color><color name="ink">#E0E9E1</color>
+    <color name="muted">#A9B7AF</color><color name="soft">#303F36</color>
+    <color name="translation">#ADD2BB</color>
+</resources>

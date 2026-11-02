@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.BilingualReader" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item><item name="colorPrimaryVariant">@color/primary</item>
+        <item name="colorSecondary">@color/primary</item><item name="colorSurface">@color/surface</item>
+        <item name="colorOnPrimary">@color/background</item><item name="colorOnSurface">@color/ink</item>
+        <item name="android:windowBackground">@color/background</item><item name="android:colorBackground">@color/background</item>
+        <item name="android:textColorPrimary">@color/ink</item><item name="android:textColorSecondary">@color/muted</item>
+        <item name="android:fontFamily">sans</item><item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/background</item><item name="android:navigationBarColor">@color/background</item>
+    </style>
+    <style name="SectionTitle"><item name="android:textSize">28sp</item><item name="android:textStyle">bold</item><item name="android:textColor">@color/ink</item></style>
+    <style name="MutedText"><item name="android:textSize">14sp</item><item name="android:textColor">@color/muted</item><item name="android:lineSpacingMultiplier">1.3</item></style>
+</resources>
