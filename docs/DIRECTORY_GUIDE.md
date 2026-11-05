@@ -10,6 +10,7 @@
 | `gradle.properties` | 公共构建参数 | A |
 | `gradle/wrapper/`、`gradlew*` | 固定 Gradle、让其他电脑可以直接构建 | A，需提交 JAR |
 | `docs/` | 共同规范、接口、环境与协作说明 | 三人 |
+| `tools/verify_phase1.py` | 在显式指定的测试模拟器上检查三个页面、章节边界、旋转和状态对应；保存截图和结果 JSON | A，运行命令见 ACCEPTANCE |
 | `samples/` | 原创、可再分发的两章 EPUB 联调样本 | B 后续扩充 |
 | `local.properties` | 每个人自己的 Android SDK 路径 | 本地文件，不提交 |
 | `work/` | 本次生成和验证的临时脚本、SDK 与构建缓存 | 不提交 |

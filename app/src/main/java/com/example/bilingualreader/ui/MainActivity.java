@@ -51,10 +51,10 @@ public final class MainActivity extends AppCompatActivity {
                       : AppCompatDelegate.MODE_NIGHT_NO;
               if (AppCompatDelegate.getDefaultNightMode() != mode)
                 AppCompatDelegate.setDefaultNightMode(mode);
-              getWindow()
-                  .getDecorView()
-                  .setSystemUiVisibility(
-                      s.getTheme() == ReaderTheme.NIGHT ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+              WindowInsetsControllerCompat controller =
+                  WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+              controller.setAppearanceLightStatusBars(s.getTheme() != ReaderTheme.NIGHT);
+              controller.setAppearanceLightNavigationBars(s.getTheme() != ReaderTheme.NIGHT);
             });
   }
 
@@ -66,6 +66,9 @@ public final class MainActivity extends AppCompatActivity {
   }
 
   private void push(Fragment fragment) {
+    if (getSupportFragmentManager().isStateSaved()) return;
+    Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+    if (current != null && current.getClass() == fragment.getClass()) return;
     getSupportFragmentManager()
         .beginTransaction()
         .replace(R.id.fragment_container, fragment)

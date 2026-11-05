@@ -1,6 +1,6 @@
 # 轻阅 · BilingualReader
 
-Java + XML 的 Android EPUB 双语阅读器。当前为 **M0 工程与界面骨架**，按 A / B / C 分工组织。
+Java + XML 的 Android EPUB 双语阅读器。当前为 **A 第一阶段：核心页面与模拟流程**，按 A / B / C 分工组织。第一阶段交付与运行验收见 [验收说明](docs/ACCEPTANCE.md)。
 
 ## 现在可以做什么
 

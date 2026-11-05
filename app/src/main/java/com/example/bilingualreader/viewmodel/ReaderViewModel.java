@@ -23,12 +23,14 @@ public final class ReaderViewModel extends BaseViewModel {
   public final MutableLiveData<UiState<Location>> location =
       new MutableLiveData<>(UiState.loading());
   private final MutableLiveData<String> chapterId = new MutableLiveData<>();
-  public final LiveData<List<ParagraphItem>> paragraphs;
+  public final LiveData<UiState<List<ParagraphItem>>> paragraphs;
   public final LiveData<TranslationTask> task;
   public final LiveData<ReaderSettings> settings;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private List<Chapter> chapters = Collections.emptyList();
   private String bookId;
+  private String requestedChapter;
+  private String requestedParagraph;
   private ReadingProgress pending;
   private ReadingProgress viewport;
   private int viewportWidth;
@@ -57,16 +59,37 @@ public final class ReaderViewModel extends BaseViewModel {
     super(graph);
     settings = graph.settings.observeSettings();
     paragraphs =
-        Transformations.switchMap(chapterId, id -> graph.reader.observeParagraphs(id, "zh-CN"));
+        Transformations.switchMap(
+            chapterId,
+            id -> {
+              MediatorLiveData<UiState<List<ParagraphItem>>> state =
+                  new MediatorLiveData<>(UiState.loading());
+              state.addSource(
+                  graph.reader.observeParagraphs(id, "zh-CN"),
+                  rows -> {
+                    if (rows != null) state.setValue(UiState.success(rows));
+                  });
+              return state;
+            });
     task =
         Transformations.switchMap(
-            chapterId, id -> graph.translation.observeLatestTask(id, "zh-CN"));
+            chapterId,
+            id -> {
+              // A new chapter without a task must not inherit the previous chapter's status.
+              MediatorLiveData<TranslationTask> state =
+                  new MediatorLiveData<>((TranslationTask) null);
+              state.addSource(graph.translation.observeLatestTask(id, "zh-CN"), state::setValue);
+              return state;
+            });
   }
 
   public void open(String book, String requestedChapter, String requestedParagraph) {
     if (book.equals(bookId) && location.getValue() != null && location.getValue().data != null)
       return;
     bookId = book;
+    this.requestedChapter = requestedChapter;
+    this.requestedParagraph = requestedParagraph;
+    location.setValue(UiState.loading());
     long token = ++generation;
     graph.io.execute(
         () -> {
@@ -105,6 +128,13 @@ public final class ReaderViewModel extends BaseViewModel {
                 });
           }
         });
+  }
+
+  public void retryOpen() {
+    if (bookId == null) return;
+    String book = bookId;
+    bookId = null;
+    open(book, requestedChapter, requestedParagraph);
   }
 
   private void select(Chapter c, String paragraph, int offset) {

@@ -16,6 +16,7 @@ public final class ReaderFragment extends BaseFragment {
   private LinearLayoutManager layout;
   private ParagraphAdapter adapter;
   private boolean restorePending, restoring;
+  private boolean restoreViewport;
   private String restoreId;
   private int restoreOffset;
   private ReaderSettings lastSettings;
@@ -43,6 +44,7 @@ public final class ReaderFragment extends BaseFragment {
     list = view.findViewById(R.id.list);
     layout = new LinearLayoutManager(requireContext());
     adapter = new ParagraphAdapter();
+    adapter.setStateRestorationPolicy(RecyclerView.Adapter.StateRestorationPolicy.PREVENT);
     list.setLayoutManager(layout);
     list.setAdapter(adapter);
     list.setItemAnimator(null);
@@ -60,6 +62,8 @@ public final class ReaderFragment extends BaseFragment {
               .setVisibility(s.status == UiState.Status.LOADING ? View.VISIBLE : View.GONE);
           view.findViewById(R.id.error)
               .setVisibility(s.status == UiState.Status.ERROR ? View.VISIBLE : View.GONE);
+          view.findViewById(R.id.retry_reading)
+              .setVisibility(s.status == UiState.Status.ERROR ? View.VISIBLE : View.GONE);
           ((TextView) view.findViewById(R.id.error)).setText(s.message);
           view.findViewById(R.id.translate).setEnabled(s.data != null);
           if (s.data != null) {
@@ -70,15 +74,22 @@ public final class ReaderFragment extends BaseFragment {
             restoreOffset =
                 viewport == null ? s.data.offset : vm.getViewportOffset(list.getWidth());
             restorePending = true;
+            restoreViewport = viewport != null;
           }
           view.findViewById(R.id.previous).setEnabled(vm.canMove(-1));
           view.findViewById(R.id.next).setEnabled(vm.canMove(1));
         });
     vm.paragraphs.observe(
         getViewLifecycleOwner(),
-        rows -> {
-          if (rows != null) {
-            adapter.submit(rows);
+        content -> {
+          boolean loading = content.status == UiState.Status.LOADING;
+          view.findViewById(R.id.loading).setVisibility(loading ? View.VISIBLE : View.GONE);
+          if (loading) adapter.submit(java.util.Collections.emptyList());
+          if (content.data != null) {
+            adapter.submit(content.data);
+            ((TextView) view.findViewById(R.id.error)).setText("本章节暂无可显示的正文，请选择其他章节。");
+            view.findViewById(R.id.error)
+                .setVisibility(content.data.isEmpty() ? View.VISIBLE : View.GONE);
             restore();
           }
         });
@@ -91,12 +102,15 @@ public final class ReaderFragment extends BaseFragment {
             restoreId = adapter.idAt(layout.findFirstVisibleItemPosition());
             restoreOffset = 0;
             restorePending = true;
+            restoreViewport = false;
           }
           lastSettings = s;
           adapter.settings(s);
           restore();
         });
+    renderTask(view, null);
     vm.task.observe(getViewLifecycleOwner(), t -> renderTask(view, t));
+    view.findViewById(R.id.retry_reading).setOnClickListener(v -> vm.retryOpen());
     view.findViewById(R.id.translate).setOnClickListener(v -> vm.translate());
     view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
     view.findViewById(R.id.previous)
@@ -186,7 +200,8 @@ public final class ReaderFragment extends BaseFragment {
     restorePending = false;
     restoring = true;
     UiState<ReaderViewModel.Location> current = vm.location.getValue();
-    if (current != null
+    if (restoreViewport
+        && current != null
         && current.data != null
         && vm.getViewport(current.data.chapter.getChapterId()) != null)
       restoreOffset = vm.getViewportOffset(list.getWidth());

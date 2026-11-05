@@ -1,0 +1,15 @@
+{
+  "passed": [
+    "Bookshelf displays demo book",
+    "Contents displays both chapters in reading order",
+    "First chapter renders and disables previous boundary",
+    "Next chapter replaces text and disables next boundary",
+    "Contents then Continue restores second chapter",
+    "Landscape and portrait retain second chapter and original text",
+    "Previous chapter returns matching text",
+    "Demo translation completes with labelled aligned paragraphs",
+    "Chapter without a task resets status; returning restores the matching task",
+    "Night settings recreate the Activity and return to reader",
+    "System back traverses contents to bookshelf"
+  ]
+}

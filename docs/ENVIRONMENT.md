@@ -50,7 +50,7 @@ macOS / Linux：`chmod +x gradlew` 后使用 `./gradlew`。
 
 ## GitHub 上传准备
 
-仓库已初始化为 `main`，未创建提交或配置远程地址。先在 Android Studio 中确认 Debug 运行，再将源码提交到自己的仓库。`gradle-wrapper.jar` 和 `samples/two-chapters.epub` 要提交，`work/`、`local.properties`、`.gradle/`、`app/build/` 不提交。
+仓库使用 `main`。截至 2026-11-05，已由团队配置 GitHub origin；本次 A 第一阶段任务不创建提交或推送。`gradle-wrapper.jar`、`samples/two-chapters.epub` 和 `tools/verify_phase1.py` 要提交，`work/`、`local.properties`、`.gradle/`、`app/build/` 不提交。
 
 本机工作目录所有者为 Administrators，Git 可能报告 `dubious ownership`。本次仅使用命令级信任参数检查，没有修改全局 Git 配置。例如在此目录检查文件：
 
@@ -77,4 +77,17 @@ Lint 警告分类：依赖更新提示 9、备份规则建议 1、整体列表�
 
 本次用本机已缓存的同版本 Gradle 8.10.2 启动构建，官方 Wrapper JAR / 脚本已随仓库提供，并固定分发包 SHA-256。Windows 首次遇到临时缓存目录占用，使用 `--no-watch-fs --max-workers=2` 后 Release 重试成功；这些本机启动参数没有写入共享构建配置。
 
-当前没有连接安卓设备，未进行实际点击、排版截图或真机验收；请按 `ACCEPTANCE.md` 操作。编译通过不能代替界面体验和真实业务验收。
+上述 2026-11-02 检查未连接安卓设备，当时没有进行实际点击和排版截图。2026-11-05 的补充运行验收记录如下。
+
+## A 第一阶段完成记录 · 2026-11-05
+
+- Debug APK 重新构建成功，输出仍为 `app/build/outputs/apk/debug/app-debug.apk`。
+- `:app:lintDebug` 通过：0 错误、35 警告；未禁用检查或新增 baseline。依赖更新提示受离线缓存影响，因此警告数与 11-02 不同，不表示本轮消除了所有旧警告。
+- 在 Android API 37、1080×1920 的临时模拟器上实际安装新版 APK，通过 11 项 UI 自动检查。
+- 检查包括书架、目录顺序、正文、上下章边界、会话内继续阅读、实际横竖屏、模拟双语对应、章节任务状态隔离、夜间设置与系统返回。
+- 检查结果保存为 `docs/phase1-results.json`，六张实际截图保存为 `docs/screenshots/phase1/`。已查看书架、阅读、双语与夜间截图。
+- 共享模型、Repository 与翻译接口未改变；未接入真实 EPUB、Room 或在线翻译，B/C 职责保持原约定。
+- 本轮未重新验证 Release，11-02 的 Release 构建结果只代表当时版本；第一阶段演示应使用此次 Debug APK。
+- 临时模拟器验收后已关闭，没有修改既有 AVD 数据。物理手机及低版本 Android 尚未覆盖。
+
+源代码与记录保持未提交状态，供团队自行审阅和提交。

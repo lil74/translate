@@ -14,6 +14,7 @@ public final class TocViewModel extends BaseViewModel {
   }
 
   public void load(String bookId) {
+    entries.setValue(UiState.loading());
     graph.io.execute(
         () -> {
           try {
