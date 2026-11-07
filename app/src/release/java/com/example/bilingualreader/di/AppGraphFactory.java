@@ -7,13 +7,15 @@ import com.example.bilingualreader.contract.model.*;
 import com.example.bilingualreader.contract.repository.*;
 import com.example.bilingualreader.contract.translation.*;
 import com.example.bilingualreader.data.repository.PreferencesSettingsRepository;
+import com.example.bilingualreader.data.repository.LocalLibraryRepository;
 import java.util.*;
 
 /** Release 不带演示正文；B/C 完成后在此接入正式实现。 */
 public final class AppGraphFactory {
   public static AppContainer create(Context context) {
+    LocalLibraryRepository library = new LocalLibraryRepository(context);
     PendingIntegration p = new PendingIntegration();
-    return new AppContainer(p, p, new PreferencesSettingsRepository(context), p, false);
+    return new AppContainer(library, library, new PreferencesSettingsRepository(context), p, false);
   }
 
   private static final class PendingIntegration
