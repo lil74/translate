@@ -13,6 +13,8 @@ Java + XML 的 Android EPUB 双语阅读器。当前为 **A 第一阶段：核�
 
 **尚未实现**：真实 EPUB 解析、Room 数据库、跨进程书籍/进度/译文保存、真实翻译、WorkManager 调度与崩溃恢复。Release 不包含演示故事，只展示待接入状态；现在不应作为完整产品验收。
 
+**C 第一阶段补充（2026-11-02）**：新增独立翻译服务适配器、Debug Fake、按 ID/哈希校验及指定 EPUB 的 JVM 验证工具；本地 33 项检查通过。真实服务尚未配置，Android 页面尚未接线。详见 [项目盘点与 C 第一阶段交付](docs/C_PHASE1.md)。
+
 ## 启动
 
 1. Android Studio 打开本目录（包含 `settings.gradle`），不是只打开 `app/`。
