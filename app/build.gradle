@@ -8,6 +8,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0'
+        testInstrumentationRunner 'com.example.bilingualreader.AIntegrationRunner'
     }
     buildTypes {
         debug { applicationIdSuffix '.debug'; versionNameSuffix '-demo' }

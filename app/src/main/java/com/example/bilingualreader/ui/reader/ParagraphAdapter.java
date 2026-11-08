@@ -14,6 +14,16 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
   private ReaderSettings settings = ReaderSettings.defaults();
   private boolean running;
 
+  public interface OnSelectionTranslate {
+    void translate(Paragraph paragraph, int start, int end);
+  }
+
+  private OnSelectionTranslate selection;
+
+  public void setOnSelectionTranslate(OnSelectionTranslate selection) {
+    this.selection = selection;
+  }
+
   public void submit(List<ParagraphItem> rows) {
     items = new ArrayList<>(rows);
     notifyDataSetChanged();
@@ -53,7 +63,37 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
     ParagraphItem row = items.get(index);
     Paragraph p = row.getParagraph();
     Translation t = row.getTranslation();
-    h.original.setText(p.getOriginalText());
+    if (!p.getOriginalText().contentEquals(h.original.getText()))
+      h.original.setText(p.getOriginalText());
+    h.original.setTextIsSelectable(true);
+    h.original.setCustomSelectionActionModeCallback(
+        new ActionMode.Callback() {
+          public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            menu.add(0, R.id.translate_selection, 1, R.string.translate_selection)
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            return true;
+          }
+
+          public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+            return false;
+          }
+
+          public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+            if (item.getItemId() != R.id.translate_selection) return false;
+            int start = Math.min(h.original.getSelectionStart(), h.original.getSelectionEnd());
+            int end = Math.max(h.original.getSelectionStart(), h.original.getSelectionEnd());
+            if (selection != null
+                && start >= 0
+                && end > start
+                && end <= p.getOriginalText().length()
+                && p.getOriginalText().contentEquals(h.original.getText()))
+              selection.translate(p, start, end);
+            mode.finish();
+            return true;
+          }
+
+          public void onDestroyActionMode(ActionMode mode) {}
+        });
     h.original.setTextSize(
         settings.getFontSizeSp() + (p.getBlockType() == BlockType.HEADING ? 4 : 0));
     h.original.setTypeface(
@@ -63,6 +103,7 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
     h.translated.setLineSpacing(0, settings.getLineSpacingMultiplier());
     boolean valid =
         t != null
+            && p.getParagraphId().equals(t.getParagraphId())
             && p.getSourceHash().equals(t.getSourceHash())
             && "en".equals(t.getSourceLanguage())
             && "zh-CN".equals(t.getTargetLanguage());

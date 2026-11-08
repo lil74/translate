@@ -44,9 +44,24 @@ public final class ReaderFragment extends BaseFragment {
     list = view.findViewById(R.id.list);
     layout = new LinearLayoutManager(requireContext());
     adapter = new ParagraphAdapter();
+    adapter.setOnSelectionTranslate(
+        (paragraph, start, end) -> {
+          androidx.fragment.app.FragmentManager manager = getChildFragmentManager();
+          if (!manager.isStateSaved()
+              && manager.findFragmentByTag(SelectionTranslationSheet.TAG) == null)
+            SelectionTranslationSheet.create(paragraph, start, end)
+                .showNow(manager, SelectionTranslationSheet.TAG);
+        });
     adapter.setStateRestorationPolicy(RecyclerView.Adapter.StateRestorationPolicy.PREVENT);
     list.setLayoutManager(layout);
     list.setAdapter(adapter);
+    vm.command.observe(
+        getViewLifecycleOwner(),
+        command -> {
+          if (command != null && command.status == UiState.Status.LOADING)
+            view.findViewById(R.id.translate).setEnabled(false);
+          else renderTask(view, vm.task.getValue());
+        });
     list.setItemAnimator(null);
     list.addOnScrollListener(
         new RecyclerView.OnScrollListener() {
@@ -86,6 +101,11 @@ public final class ReaderFragment extends BaseFragment {
           view.findViewById(R.id.loading).setVisibility(loading ? View.VISIBLE : View.GONE);
           if (loading) adapter.submit(java.util.Collections.emptyList());
           if (content.data != null) {
+            UiState<ReaderViewModel.Location> current = vm.location.getValue();
+            if (current == null || current.data == null) return;
+            for (ParagraphItem row : content.data)
+              if (!row.getParagraph().getChapterId().equals(current.data.chapter.getChapterId()))
+                return;
             adapter.submit(content.data);
             ((TextView) view.findViewById(R.id.error)).setText("本章节暂无可显示的正文，请选择其他章节。");
             view.findViewById(R.id.error)
@@ -111,7 +131,18 @@ public final class ReaderFragment extends BaseFragment {
     renderTask(view, null);
     vm.task.observe(getViewLifecycleOwner(), t -> renderTask(view, t));
     view.findViewById(R.id.retry_reading).setOnClickListener(v -> vm.retryOpen());
-    view.findViewById(R.id.translate).setOnClickListener(v -> vm.translate());
+    view.findViewById(R.id.translate)
+        .setOnClickListener(
+            v -> {
+              if (graph().demo) vm.translate();
+              else
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("翻译当前章节")
+                    .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
+                    .setNegativeButton("暂不翻译", null)
+                    .setPositiveButton("继续", (dialog, which) -> vm.translate())
+                    .show();
+            });
     view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
     view.findViewById(R.id.previous)
         .setOnClickListener(
@@ -180,6 +211,8 @@ public final class ReaderFragment extends BaseFragment {
             : t.getTotalCount() == 0
                 ? 100
                 : Math.round(t.getSuccessCount() * 100f / t.getTotalCount()));
+    if (t != null) label += " · 失败 " + t.getFailedCount();
+    ((TextView) view.findViewById(R.id.task_status)).setText(label);
     ((Button) view.findViewById(R.id.translate)).setText(button);
     view.findViewById(R.id.translate)
         .setEnabled(

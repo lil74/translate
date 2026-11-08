@@ -1,0 +1,16 @@
+INSTRUMENTATION_STATUS: stream=PASS: Real book and A-saved reading progress survive process restart
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Real TOC uses plain rows with hierarchy and no chapter cards
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Continue opens saved chapter after process restart
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: passed=3
+INSTRUMENTATION_RESULT: stream=Real book and A-saved reading progress survive process restart
+Real TOC uses plain rows with hierarchy and no chapter cards
+Continue opens saved chapter after process restart
+ALL PASSED
+
+INSTRUMENTATION_CODE: -1
