@@ -87,11 +87,24 @@ public final class MainActivity extends AppCompatActivity {
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
     menu.add(0, 1, 0, "阅读设置").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+    if (((ReaderApplication) getApplication()).getContainer().translation
+        instanceof com.example.bilingualreader.di.TranslationDiagnostics)
+      menu.add(0, 2, 1, "模拟翻译失败（联调）");
     return true;
   }
 
   @Override
   public boolean onOptionsItemSelected(MenuItem item) {
+    if (item.getItemId() == 2) {
+      com.example.bilingualreader.contract.translation.TranslationCoordinator translator =
+          ((ReaderApplication) getApplication()).getContainer().translation;
+      if (translator instanceof com.example.bilingualreader.di.TranslationDiagnostics) {
+        ((com.example.bilingualreader.di.TranslationDiagnostics) translator).failNextRequest();
+        android.widget.Toast.makeText(this, "下一次未完成段落将模拟失败，可验证重试", android.widget.Toast.LENGTH_LONG)
+            .show();
+      }
+      return true;
+    }
     if (item.getItemId() == 1) {
       push(new SettingsFragment());
       return true;

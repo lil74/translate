@@ -32,7 +32,8 @@ public final class BookshelfFragment extends BaseFragment {
     vm = models().get(BookshelfViewModel.class);
     commands(vm);
     ((TextView) view.findViewById(R.id.mode_banner))
-        .setText(graph().demo ? "界面演示版 · 内置两章故事\n模拟译文仅供联调，真实 EPUB 导入待接入。" : "初始框架 · 正式数据与翻译模块尚待接入");
+        .setText(
+            graph().demo ? "本地书库 · 导入 EPUB 开始阅读\n当前使用模拟翻译，不会发送原文到网络。" : "本地书库 · 书籍与阅读位置保存在此设备");
     EntryAdapter<Book> adapter =
         new EntryAdapter<>(
             new EntryAdapter.Presenter<Book>() {
@@ -55,7 +56,7 @@ public final class BookshelfFragment extends BaseFragment {
               public void longClick(Book b) {
                 new MaterialAlertDialogBuilder(requireContext())
                     .setTitle("删除《" + b.getTitle() + "》？")
-                    .setMessage("将删除书籍、译文和阅读位置。" + (graph().demo ? "演示书籍将在重启应用后恢复。" : ""))
+                    .setMessage("将删除书籍、译文和阅读位置。" + "")
                     .setNegativeButton("保留", null)
                     .setPositiveButton("删除", (d, w) -> vm.deleteBook(b.getBookId()))
                     .show();
@@ -77,9 +78,11 @@ public final class BookshelfFragment extends BaseFragment {
         });
     vm.command.observe(
         getViewLifecycleOwner(),
-        s ->
-            view.findViewById(R.id.import_book)
-                .setEnabled(s == null || s.status != UiState.Status.LOADING));
+        s -> {
+          boolean busy = s != null && s.status == UiState.Status.LOADING;
+          view.findViewById(R.id.import_book).setEnabled(!busy);
+          view.findViewById(R.id.command_progress).setVisibility(busy ? View.VISIBLE : View.GONE);
+        });
     view.findViewById(R.id.import_book)
         .setOnClickListener(
             v -> picker.launch(new String[] {"application/epub+zip", "application/octet-stream"}));

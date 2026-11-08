@@ -7,6 +7,7 @@
         <com.google.android.material.button.MaterialButton android:id="@+id/import_book" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="＋ 导入 EPUB"/>
     </LinearLayout>
     <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"/>
+    <TextView android:id="@+id/command_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="正在处理，请稍候…" android:paddingVertical="12dp" style="@style/MutedText" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
     <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="32dp" android:gravity="center" style="@style/MutedText" android:text="书架还是空的
 导入一本 EPUB，开始你的阅读" android:visibility="gone"/>
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:clipToPadding="false" android:paddingTop="12dp"/>
