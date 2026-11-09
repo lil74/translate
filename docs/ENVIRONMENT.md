@@ -1,6 +1,10 @@
 # 开发环境与构建
 
+<<<<<<< Updated upstream
 最新补充（2026-11-08）：当前 Debug、测试 APK、Release 构建通过，Lint 0 错误/47 警告；API 37 设备集成检查 8 项、杀进程后续读检查 3 项全部通过。当前源码、组装边界与截图见 A_COMPLETE.md。以下历史记录保持原日期。
+=======
+> 2026-11-07 C 更新：使用本机 JBR 21.0.10、锁定的 Gradle 8.10.2、SDK 35 和 Build-Tools 34.0.0 验证。13 项 JVM 测试、API 36 真机上的 9 项 Room / WorkManager 测试通过，Lint 0 错误；Debug / Release 编译通过。当前完整状态见 [C_IMPLEMENTATION.md](C_IMPLEMENTATION.md) 和 [c-results.json](c-results.json)。下文 A 的模拟器记录保留为历史记录。
+>>>>>>> Stashed changes
 
 ## 团队固定版本
 

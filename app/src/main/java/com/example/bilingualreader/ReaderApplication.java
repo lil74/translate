@@ -11,6 +11,14 @@ public final class ReaderApplication extends Application {
   public void onCreate() {
     super.onCreate();
     container = AppGraphFactory.create(this);
+    container.io.execute(() -> {
+      try {
+        ((com.example.bilingualreader.translation.WorkTranslationCoordinator) container.translation)
+            .recoverUnfinishedTasks();
+      } catch (com.example.bilingualreader.contract.model.AppException error) {
+        android.util.Log.w("TranslationRecovery", "Recovery deferred: " + error.getCode());
+      }
+    });
   }
 
   public AppContainer getContainer() {

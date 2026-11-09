@@ -131,6 +131,7 @@ public final class ReaderFragment extends BaseFragment {
     renderTask(view, null);
     vm.task.observe(getViewLifecycleOwner(), t -> renderTask(view, t));
     view.findViewById(R.id.retry_reading).setOnClickListener(v -> vm.retryOpen());
+<<<<<<< Updated upstream
     view.findViewById(R.id.translate)
         .setOnClickListener(
             v -> {
@@ -143,6 +144,21 @@ public final class ReaderFragment extends BaseFragment {
                     .setPositiveButton("继续", (dialog, which) -> vm.translate())
                     .show();
             });
+=======
+    view.findViewById(R.id.translate).setOnClickListener(v -> {
+      com.example.bilingualreader.translation.TranslationConfigStore config = graph().translationConfig;
+      if (config.needsConsent()) {
+        String endpoint = config.endpoint();
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("发送本章原文用于翻译？")
+            .setMessage("本章英语原文会发送到：\n" + endpoint + "\n\n译文会保存在手机中。请确认你同意向该服务发送原文。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("同意并翻译", (dialog, which) -> {
+              if (endpoint.equals(config.endpoint())) { config.consent(endpoint); vm.translate(); }
+            }).show();
+      } else vm.translate();
+    });
+>>>>>>> Stashed changes
     view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
     view.findViewById(R.id.previous)
         .setOnClickListener(
@@ -181,7 +197,7 @@ public final class ReaderFragment extends BaseFragment {
     if (t != null) {
       switch (t.getState()) {
         case QUEUED:
-          label = "等待翻译";
+          label = t.getErrorMessage() == null ? "等待网络或开始翻译" : t.getErrorMessage();
           break;
         case RUNNING:
           label = "正在翻译";
@@ -202,7 +218,8 @@ public final class ReaderFragment extends BaseFragment {
       }
       label += " · " + t.getSuccessCount() + " / " + t.getTotalCount();
     }
-    if (graph().demo) label = "模拟演示 · " + label;
+    if (graph().demo || com.example.bilingualreader.translation.TranslationConfigStore.MOCK
+        .equals(graph().translationConfig.mode())) label = "模拟验证 · " + label;
     ((TextView) view.findViewById(R.id.task_status)).setText(label);
     ProgressBar bar = view.findViewById(R.id.progress);
     bar.setProgress(

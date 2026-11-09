@@ -1,5 +1,6 @@
 # 工程目录与分工说明
 
+<<<<<<< Updated upstream
 ## 2026-11-08 当前接线补充
 
 最新功能与验证以 A_COMPLETE.md 为准；下文最初骨架描述保留作背景。
@@ -14,6 +15,9 @@
 | `docs/screenshots/a-complete/` | 本轮实际模拟器截图 |
 
 两个 AppGraphFactory 均已连接 LocalLibraryRepository；旧 DemoRepository 不再用于普通 Debug 入口。完整模型/接口未变，B/C 的源文件未在此轮修改。
+=======
+> 2026-11-07：C 的正式 Coordinator、Worker 和翻译流程已接入；以下早期“待接线”说明保留为协作背景，当前实现以 [C_IMPLEMENTATION.md](C_IMPLEMENTATION.md) 为准。
+>>>>>>> Stashed changes
 
 ## 根目录
 

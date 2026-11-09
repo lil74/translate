@@ -1,8 +1,12 @@
 # 接口对接说明 · M0
 
+<<<<<<< Updated upstream
 选词/选句翻译补充：已有 TranslationService、请求和响应类型均不变。AppContainer 新增 selectionTranslation 与 selectionDemo，提供七参数构造方法，原五参数构造方法保留。临时查询不经过章节 Coordinator/TranslationStore。C 的详细接线说明见 C_SELECTION_TRANSLATION.md。
 
 2026-11-08 补充：共享签名与字段未变。当前两个 Factory 已接真实 LocalLibraryRepository；Debug 用 StoreDemoCoordinator + FakeTranslationService + TranslationStore 验证 A 界面，Release 使用 UnavailableTranslationCoordinator 等待 C 正式调度。具体替换方法见 A_COMPLETE.md。下文保留最初契约说明。
+=======
+> 2026-11-07 补充：原 Book / Reader / TranslationStore / Coordinator / Service 的方法和业务字段未改变。新增 `TranslationRuntimeStore extends TranslationStore`，用于服务快照、活跃任务、可运行段落及持久化尝试计数；仍由 LocalLibraryRepository 唯一写库。任务与配置用 prepareConfiguredTask 原子创建，数据库升级为版本 2，见 C_IMPLEMENTATION.md。AppException 移除 final，允许 RetryAfterException 携带服务端等待时间，原构造和 getter 不变。
+>>>>>>> Stashed changes
 
 本次没有修改 v1.0 业务字段、方法签名或状态枚举。原说明完整保存在 `PROJECT_SPEC.md`；此文件只说明源码落点和调用方式。
 
@@ -41,7 +45,8 @@ LiveData 的首次数据到达之前显示加载状态。空列表代表查询�
 // books / reader / store = B 的正式实现
 // coordinator = C 的正式实现（依赖 store 和 WorkManager）
 return new AppContainer(books, reader,
-    new PreferencesSettingsRepository(context), coordinator, false);
+    new PreferencesSettingsRepository(context), coordinator, false,
+    runtimeStore, translationConfig);
 ```
 
 将来确需改签名时，先修改 PROJECT_SPEC 的版本号和本文件，再同时修改 contract、模拟实现、正式实现和调用方；不要各自再定义同名 Book 或 Paragraph。

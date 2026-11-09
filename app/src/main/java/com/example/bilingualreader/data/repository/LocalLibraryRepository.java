@@ -18,11 +18,15 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /** Blocking commands are called from the ViewModel executor or Worker. */
-public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationStore {
+public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationRuntimeStore {
   private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
   public LocalLibraryRepository(Context context) {
     this.context=context.getApplicationContext();
-    db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db").build();dao=db.dao();
+    db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db")
+        .addMigrations(LibraryDatabase.MIGRATION_1_2).build();dao=db.dao();
+  }
+  public LocalLibraryRepository(Context context, LibraryDatabase database) {
+    this.context=context.getApplicationContext(); this.db=database; this.dao=db.dao();
   }
   private static AppException err(ErrorCode code,String message){return new AppException(code,message,false);}
   private String name(Uri uri) {try(Cursor c=context.getContentResolver().query(uri,null,null,null,null)){if(c!=null&&c.moveToFirst()){int col=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(col>=0)return c.getString(col);}}catch(Exception ignored){}String s=uri.getLastPathSegment();return s==null?"Imported book.epub":s;}
@@ -76,29 +80,248 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
   }
   public ReadingProgress getReadingProgress(String id)throws AppException{if(dao.book(id)==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");ProgressRow p=dao.progress(id);return p==null?null:new ReadingProgress(p.bookId,p.chapterId,p.paragraphId,p.offsetPx,p.updatedAt);}
   public void saveReadingProgress(ReadingProgress p)throws AppException{if(dao.book(p.getBookId())==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");ProgressRow r=new ProgressRow();r.bookId=p.getBookId();r.chapterId=p.getChapterId();r.paragraphId=p.getParagraphId();r.offsetPx=p.getOffsetPx();r.updatedAt=p.getUpdatedAt();db.runInTransaction(()->{dao.putProgress(r);dao.touchBook(r.bookId,r.updatedAt);});}
-  private boolean success(ParagraphRow p,String lang,String src){TranslationRow t=dao.translation(p.paragraphId,lang);return t!=null&&"SUCCESS".equals(t.status)&&src.equals(t.sourceLanguage)&&p.sourceHash.equals(t.sourceHash)&&t.translatedText!=null&&!t.translatedText.trim().isEmpty();}
-  private static TranslationTask task(TaskRow t){return t==null?null:new TranslationTask(t.taskId,t.chapterId,t.sourceLanguage,t.targetLanguage,TaskState.valueOf(t.state),t.totalCount,t.successCount,t.failedCount,t.createdAt,t.updatedAt,t.errorCode,t.errorMessage);}
-  private TaskRow requireTask(String id)throws AppException{TaskRow t=dao.task(id);if(t==null)throw err(ErrorCode.CHAPTER_NOT_FOUND,"翻译任务不存在");return t;}
-  private void active(TaskRow t)throws AppException{if(!"QUEUED".equals(t.state)&&!"RUNNING".equals(t.state))throw err(ErrorCode.TRANSLATION_FAILED,"翻译任务已结束");}
-  private void recount(TaskRow t){int ok=0,failed=0;for(ParagraphRow p:dao.paragraphs(t.chapterId)){if(success(p,t.targetLanguage,t.sourceLanguage))ok++;else{TranslationRow r=dao.translation(p.paragraphId,t.targetLanguage);if(r!=null&&"FAILED".equals(r.status))failed++;}}t.successCount=ok;t.failedCount=failed;t.updatedAt=System.currentTimeMillis();dao.updateTask(t);}
-  public synchronized TranslationTask prepareTask(String chapterId,String sourceLanguage,String targetLanguage)throws AppException{
-    if(!"en".equals(sourceLanguage)||!"zh-CN".equals(targetLanguage))throw err(ErrorCode.UNSUPPORTED_LANGUAGE,"仅支持英语翻译为简体中文");
-    TaskRow existing=dao.activeTask(chapterId,sourceLanguage,targetLanguage);if(existing!=null)return task(existing);
-    List<ParagraphRow> ps=dao.paragraphs(chapterId);if(ps.isEmpty())throw err(ErrorCode.CHAPTER_NOT_FOUND,"章节不存在或没有正文");
-    TaskRow t=new TaskRow();t.taskId=UUID.randomUUID().toString();t.chapterId=chapterId;t.sourceLanguage=sourceLanguage;t.targetLanguage=targetLanguage;t.totalCount=ps.size();t.createdAt=t.updatedAt=System.currentTimeMillis();t.state="QUEUED";
-    db.runInTransaction(()->{for(ParagraphRow p:ps){if(success(p,targetLanguage,sourceLanguage))t.successCount++;else{TranslationRow r=dao.translation(p.paragraphId,targetLanguage);if(r!=null){r.status="PENDING";r.errorCode=null;r.updatedAt=t.createdAt;dao.putTranslation(r);}}}if(t.successCount==t.totalCount)t.state="COMPLETED";dao.insertTask(t);});return task(t);
+
+  private interface Transaction<T> { T run() throws AppException; }
+  private <T> T transaction(Transaction<T> action) throws AppException {
+    db.beginTransaction();
+    try {
+      T value = action.run(); db.setTransactionSuccessful(); return value;
+    } catch (AppException error) { throw error;
+    } catch (RuntimeException error) {
+      throw new AppException(ErrorCode.DATABASE_ERROR, "翻译数据保存失败", false, error);
+    } finally { db.endTransaction(); }
   }
-  public List<Paragraph> getPendingParagraphs(String id)throws AppException{TaskRow t=requireTask(id);List<Paragraph> out=new ArrayList<>();for(ParagraphRow p:dao.paragraphs(t.chapterId))if(!success(p,t.targetLanguage,t.sourceLanguage))out.add(new Paragraph(p.paragraphId,p.chapterId,p.orderIndex,BlockType.valueOf(p.blockType),p.originalText,p.sourceHash));return out;}
-  public void markTaskRunning(String id)throws AppException{TaskRow t=requireTask(id);active(t);t.state="RUNNING";t.updatedAt=System.currentTimeMillis();dao.updateTask(t);}
-  public void markBatchRunning(String id,List<String> ids)throws AppException{TaskRow t=requireTask(id);active(t);Set<String> selected=new HashSet<>(ids);db.runInTransaction(()->{for(ParagraphRow p:dao.paragraphs(t.chapterId))if(selected.contains(p.paragraphId)&&!success(p,t.targetLanguage,t.sourceLanguage)){TranslationRow r=new TranslationRow();r.paragraphId=p.paragraphId;r.targetLanguage=t.targetLanguage;r.sourceLanguage=t.sourceLanguage;r.sourceHash=p.sourceHash;r.status="RUNNING";r.updatedAt=System.currentTimeMillis();dao.putTranslation(r);}});}
-  public synchronized void applyBatchResult(String id,TranslationBatchResult result)throws AppException{TaskRow t=requireTask(id);active(t);if(!id.equals(result.getTaskId()))throw err(ErrorCode.INVALID_RESPONSE,"任务 ID 不匹配");Map<String,ParagraphRow> allowed=new HashMap<>();for(ParagraphRow p:dao.paragraphs(t.chapterId))allowed.put(p.paragraphId,p);Set<String> seen=new HashSet<>();for(TranslationOutput o:result.getItems()){ParagraphRow p=allowed.get(o.getParagraphId());if(p==null||!seen.add(o.getParagraphId())||!p.sourceHash.equals(o.getSourceHash())||(o.getStatus()==TranslationStatus.SUCCESS&&(o.getTranslatedText()==null||o.getTranslatedText().trim().isEmpty())))throw err(ErrorCode.INVALID_RESPONSE,"翻译结果与原文不匹配");}
-    db.runInTransaction(()->{for(TranslationOutput o:result.getItems()){ParagraphRow p=allowed.get(o.getParagraphId());if(success(p,t.targetLanguage,t.sourceLanguage))continue;TranslationRow r=new TranslationRow();r.paragraphId=p.paragraphId;r.targetLanguage=t.targetLanguage;r.sourceLanguage=t.sourceLanguage;r.sourceHash=p.sourceHash;r.status=o.getStatus().name();r.translatedText=o.getTranslatedText();r.provider=o.getProvider();r.engineVersion=o.getEngineVersion();r.errorCode=o.getErrorCode();r.updatedAt=System.currentTimeMillis();dao.putTranslation(r);}recount(t);});
+  private boolean success(ParagraphRow p, String lang, String src) {
+    TranslationRow t = dao.translation(p.paragraphId, lang);
+    return t != null && "SUCCESS".equals(t.status) && src.equals(t.sourceLanguage)
+        && p.sourceHash.equals(t.sourceHash) && t.translatedText != null && !t.translatedText.trim().isEmpty();
   }
-  public void markBatchFailed(String id,List<String> ids,String code,String message)throws AppException{TaskRow t=requireTask(id);active(t);Set<String> selected=new HashSet<>(ids);db.runInTransaction(()->{for(ParagraphRow p:dao.paragraphs(t.chapterId))if(selected.contains(p.paragraphId)&&!success(p,t.targetLanguage,t.sourceLanguage)){TranslationRow r=new TranslationRow();r.paragraphId=p.paragraphId;r.targetLanguage=t.targetLanguage;r.sourceLanguage=t.sourceLanguage;r.sourceHash=p.sourceHash;r.status="FAILED";r.errorCode=code;r.updatedAt=System.currentTimeMillis();dao.putTranslation(r);}recount(t);});}
-  public void finishTask(String id)throws AppException{TaskRow t=requireTask(id);active(t);db.runInTransaction(()->{recount(t);t.state=t.successCount==t.totalCount?"COMPLETED":t.successCount>0?"PARTIAL_FAILED":"FAILED";t.updatedAt=System.currentTimeMillis();dao.updateTask(t);});}
-  public void failTask(String id,String code,String message)throws AppException{TaskRow t=requireTask(id);active(t);t.state="FAILED";t.errorCode=code;t.errorMessage=message;t.updatedAt=System.currentTimeMillis();dao.updateTask(t);}
-  public void cancelTask(String id)throws AppException{TaskRow t=requireTask(id);active(t);db.runInTransaction(()->{t.state="CANCELLED";t.updatedAt=System.currentTimeMillis();dao.updateTask(t);for(ParagraphRow p:dao.paragraphs(t.chapterId)){TranslationRow r=dao.translation(p.paragraphId,t.targetLanguage);if(r!=null&&"RUNNING".equals(r.status)){r.status="PENDING";dao.putTranslation(r);}}});}
-  public boolean isTaskCancelled(String id)throws AppException{return "CANCELLED".equals(requireTask(id).state);}
-  public LiveData<TranslationTask> observeTask(String id){return Transformations.map(dao.observeTask(id),LocalLibraryRepository::task);}
-  public LiveData<TranslationTask> observeLatestTask(String chapterId,String lang){return Transformations.map(dao.observeLatestTask(chapterId,lang),LocalLibraryRepository::task);}
+  private static TranslationTask task(TaskRow t) {
+    return t == null ? null : new TranslationTask(t.taskId, t.chapterId, t.sourceLanguage,
+        t.targetLanguage, TaskState.valueOf(t.state), t.totalCount, t.successCount,
+        t.failedCount, t.createdAt, t.updatedAt, t.errorCode, t.errorMessage);
+  }
+  private static boolean active(TaskRow t) {
+    return t != null && ("QUEUED".equals(t.state) || "RUNNING".equals(t.state));
+  }
+  private TaskRow requireTask(String id) throws AppException {
+    TaskRow t = dao.task(id);
+    if (t == null) throw err(ErrorCode.CHAPTER_NOT_FOUND, "翻译任务不存在或书籍已删除");
+    return t;
+  }
+  private void recount(TaskRow t) {
+    int ok = 0, failed = 0;
+    List<ParagraphRow> paragraphs = dao.paragraphs(t.chapterId);
+    for (ParagraphRow p : paragraphs) {
+      if (success(p, t.targetLanguage, t.sourceLanguage)) ok++;
+      else {
+        TranslationRow r = dao.translation(p.paragraphId, t.targetLanguage);
+        if (r != null && p.sourceHash.equals(r.sourceHash) && "FAILED".equals(r.status)) failed++;
+      }
+    }
+    t.totalCount = paragraphs.size(); t.successCount = ok; t.failedCount = failed;
+    t.updatedAt = System.currentTimeMillis(); dao.updateTask(t);
+  }
+  private TranslationRow row(ParagraphRow p, TaskRow t, String status) {
+    TranslationRow r = new TranslationRow(); r.paragraphId = p.paragraphId;
+    r.targetLanguage = t.targetLanguage; r.sourceLanguage = t.sourceLanguage;
+    r.sourceHash = p.sourceHash; r.status = status; r.updatedAt = System.currentTimeMillis();
+    return r;
+  }
+  private void resetRunning(TaskRow t) {
+    for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
+      TranslationRow r = dao.translation(p.paragraphId, t.targetLanguage);
+      if (r != null && "RUNNING".equals(r.status)) {
+        r.status = "PENDING"; r.updatedAt = System.currentTimeMillis(); dao.putTranslation(r);
+      }
+    }
+  }
+  @Override public TranslationTask prepareTask(String chapterId, String source, String target)
+      throws AppException {
+    if (!"en".equals(source) || !"zh-CN".equals(target))
+      throw err(ErrorCode.UNSUPPORTED_LANGUAGE, "仅支持英语翻译为简体中文");
+    return transaction(() -> {
+      if (dao.chapter(chapterId) == null) throw err(ErrorCode.CHAPTER_NOT_FOUND, "章节不存在");
+      TaskRow existing = dao.activeTask(chapterId, source, target);
+      if (existing != null) return task(existing);
+      TaskRow t = new TaskRow(); t.taskId = UUID.randomUUID().toString(); t.chapterId = chapterId;
+      t.sourceLanguage = source; t.targetLanguage = target; t.state = "QUEUED";
+      t.createdAt = t.updatedAt = System.currentTimeMillis();
+      List<ParagraphRow> paragraphs = dao.paragraphs(chapterId); t.totalCount = paragraphs.size();
+      for (ParagraphRow p : paragraphs) {
+        if (success(p, target, source)) t.successCount++;
+        else dao.putTranslation(row(p, t, "PENDING"));
+      }
+      if (t.successCount == t.totalCount) t.state = "COMPLETED";
+      dao.insertTask(t); return task(t);
+    });
+  }
+  @Override public List<Paragraph> getPendingParagraphs(String id) throws AppException {
+    return pending(id, false);
+  }
+  @Override public TranslationTask prepareConfiguredTask(String chapterId, String source, String target,
+      String mode, String endpoint) throws AppException {
+    return transaction(() -> {
+      TranslationTask prepared = prepareTask(chapterId, source, target);
+      bindService(prepared.getTaskId(), mode, endpoint);
+      return prepared;
+    });
+  }
+  @Override public List<Paragraph> getRunnableParagraphs(String id) throws AppException {
+    return pending(id, true);
+  }
+  private List<Paragraph> pending(String id, boolean skipFailed) throws AppException {
+    return transaction(() -> {
+      TaskRow t = requireTask(id); List<Paragraph> out = new ArrayList<>();
+      if (!active(t)) return out;
+      for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
+        TranslationRow r = dao.translation(p.paragraphId, t.targetLanguage);
+        if (!success(p, t.targetLanguage, t.sourceLanguage)
+            && !(skipFailed && r != null && "FAILED".equals(r.status))) {
+          out.add(new Paragraph(p.paragraphId, p.chapterId, p.orderIndex,
+              BlockType.valueOf(p.blockType), p.originalText, p.sourceHash));
+        }
+      }
+      return out;
+    });
+  }
+  @Override public void markTaskRunning(String id) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (active(t)) {
+      t.state = "RUNNING"; t.errorCode = null; t.errorMessage = null;
+      t.updatedAt = System.currentTimeMillis(); dao.updateTask(t);
+    } return null; });
+  }
+  @Override public void markBatchRunning(String id, List<String> ids) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
+      Set<String> selected = new HashSet<>(ids);
+      for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
+        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage))
+          dao.putTranslation(row(p, t, "RUNNING"));
+      } return null;
+    });
+  }
+  @Override public void applyBatchResult(String id, TranslationBatchResult result) throws AppException {
+    transaction(() -> {
+      TaskRow t = dao.task(id);
+      // Cancellation/deletion and result writes share this transaction boundary.
+      if (!active(t)) return null;
+      if (!id.equals(result.getTaskId()) || result.getRequestId().trim().isEmpty())
+        throw err(ErrorCode.INVALID_RESPONSE, "翻译请求标识不匹配");
+      Map<String, ParagraphRow> allowed = new HashMap<>();
+      for (ParagraphRow p : dao.paragraphs(t.chapterId)) allowed.put(p.paragraphId, p);
+      Set<String> seen = new HashSet<>();
+      for (TranslationOutput o : result.getItems()) {
+        ParagraphRow p = o == null ? null : allowed.get(o.getParagraphId());
+        if (p == null || !seen.add(o.getParagraphId()) || !p.sourceHash.equals(o.getSourceHash())
+            || (o.getStatus() != TranslationStatus.SUCCESS && o.getStatus() != TranslationStatus.FAILED)
+            || (o.getStatus() == TranslationStatus.SUCCESS
+                && (o.getTranslatedText() == null || o.getTranslatedText().trim().isEmpty())))
+          throw err(ErrorCode.INVALID_RESPONSE, "翻译结果与原文不匹配");
+      }
+      for (TranslationOutput o : result.getItems()) {
+        ParagraphRow p = allowed.get(o.getParagraphId());
+        if (success(p, t.targetLanguage, t.sourceLanguage)) continue;
+        TranslationRow r = row(p, t, o.getStatus().name()); r.translatedText = o.getTranslatedText();
+        r.provider = o.getProvider(); r.engineVersion = o.getEngineVersion(); r.errorCode = o.getErrorCode();
+        dao.putTranslation(r);
+      }
+      recount(t); return null;
+    });
+  }
+  @Override public void markBatchFailed(String id, List<String> ids, String code, String message)
+      throws AppException {
+    transaction(() -> {
+      TaskRow t = dao.task(id); if (!active(t)) return null;
+      Set<String> selected = new HashSet<>(ids);
+      for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
+        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage)) {
+          TranslationRow r = row(p, t, "FAILED"); r.errorCode = code; dao.putTranslation(r);
+        }
+      }
+      t.errorCode = code; t.errorMessage = message; recount(t); return null;
+    });
+  }
+  @Override public void finishTask(String id) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
+      recount(t); t.state = t.successCount == t.totalCount ? "COMPLETED"
+          : t.successCount > 0 ? "PARTIAL_FAILED" : "FAILED";
+      if (!"COMPLETED".equals(t.state) && t.errorMessage == null) {
+        t.errorCode = ErrorCode.TRANSLATION_FAILED.name(); t.errorMessage = "部分段落未完成，可重试未完成段落";
+      }
+      if ("COMPLETED".equals(t.state)) { t.errorCode = null; t.errorMessage = null; }
+      dao.updateTask(t); return null;
+    });
+  }
+  @Override public void failTask(String id, String code, String message) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
+      resetRunning(t); recount(t); t.state = "FAILED"; t.errorCode = code; t.errorMessage = message;
+      dao.updateTask(t); return null;
+    });
+  }
+  @Override public void cancelTask(String id) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
+      resetRunning(t); recount(t); t.state = "CANCELLED"; dao.updateTask(t); return null;
+    });
+  }
+  @Override public boolean isTaskCancelled(String id) throws AppException {
+    return transaction(() -> { TaskRow t = dao.task(id); return t == null || "CANCELLED".equals(t.state); });
+  }
+  @Override public LiveData<TranslationTask> observeTask(String id) {
+    return Transformations.map(dao.observeTask(id), LocalLibraryRepository::task);
+  }
+  @Override public LiveData<TranslationTask> observeLatestTask(String chapterId, String lang) {
+    return Transformations.map(dao.observeLatestTask(chapterId, lang), LocalLibraryRepository::task);
+  }
+  @Override public TranslationTask getTask(String id) throws AppException {
+    return transaction(() -> task(dao.task(id)));
+  }
+  @Override public List<TranslationTask> getActiveTasks() throws AppException {
+    return transaction(() -> { List<TranslationTask> out = new ArrayList<>();
+      for (TaskRow t : dao.activeTasks()) out.add(task(t)); return out; });
+  }
+  @Override public List<TranslationTask> getBookTasks(String bookId) throws AppException {
+    return transaction(() -> { List<TranslationTask> out = new ArrayList<>();
+      for (TaskRow t : dao.bookTasks(bookId)) out.add(task(t)); return out; });
+  }
+  @Override public void bindService(String id, String mode, String endpoint) throws AppException {
+    transaction(() -> { TaskRow t = requireTask(id);
+      if (active(t) && t.executionMode.isEmpty()) {
+        t.executionMode = mode; t.endpoint = endpoint; dao.updateTask(t);
+      } return null;
+    });
+  }
+  @Override public String[] getService(String id) throws AppException {
+    return transaction(() -> { TaskRow t = requireTask(id); return new String[]{t.executionMode, t.endpoint}; });
+  }
+  @Override public Attempt getAttempt(String id) throws AppException {
+    return transaction(() -> { RequestRow r = dao.request(id);
+      return r == null ? new Attempt(0, 0, null, null)
+          : new Attempt(r.attempts, r.notBefore, r.errorCode, r.message);
+    });
+  }
+  @Override public boolean claimAttempt(String taskId, String id, long now) throws AppException {
+    return transaction(() -> {
+      if (!active(dao.task(taskId))) return false;
+      RequestRow r = dao.request(id);
+      if (r == null) { r = new RequestRow(); r.requestId = id; r.taskId = taskId; }
+      if (!taskId.equals(r.taskId) || r.attempts >= 3 || r.notBefore > now) return false;
+      r.attempts++; dao.putRequest(r); return true;
+    });
+  }
+  @Override public void postponeAttempt(String taskId, String id, long until, String code, String message)
+      throws AppException {
+    transaction(() -> {
+      if (!active(dao.task(taskId))) return null;
+      RequestRow r = dao.request(id);
+      if (r != null && taskId.equals(r.taskId)) {
+        r.notBefore = until; r.errorCode = code; r.message = message; dao.putRequest(r);
+      } return null;
+    });
+  }
+  @Override public void markTaskWaiting(String id, String code, String message) throws AppException {
+    transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
+      resetRunning(t); recount(t); t.state = "QUEUED"; t.errorCode = code; t.errorMessage = message;
+      dao.updateTask(t); return null;
+    });
+  }
 }

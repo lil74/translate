@@ -1,5 +1,7 @@
 # 项目盘点与 C 第一阶段交付
 
+> 本文保留第一阶段历史状态；当前 C 的四阶段实现、接线和验证以 [C_IMPLEMENTATION.md](C_IMPLEMENTATION.md) 为准。
+
 ## 当前项目有什么
 
 实际 Android Studio 工程在本说明上一级目录 `translate/`（包含 settings.gradle），外层放用户提供的说明和 EPUB。工程使用 Java + XML，单 app 模块；包名 com.example.bilingualreader，minSdk 26，compileSdk/targetSdk 35，Gradle 8.10.2、AGP 8.7.3，Java 源码目标 17，约定用 JDK 21 构建。

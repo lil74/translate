@@ -8,9 +8,19 @@ import java.util.List;
 @Database(entities={LibraryDatabase.BookRow.class,LibraryDatabase.ChapterRow.class,
     LibraryDatabase.ParagraphRow.class,LibraryDatabase.TocRow.class,
     LibraryDatabase.ProgressRow.class,LibraryDatabase.TranslationRow.class,
-    LibraryDatabase.TaskRow.class},version=1,exportSchema=false)
+    LibraryDatabase.TaskRow.class,LibraryDatabase.RequestRow.class},version=2,exportSchema=false)
 public abstract class LibraryDatabase extends RoomDatabase {
   public abstract DaoAccess dao();
+
+  public static final androidx.room.migration.Migration MIGRATION_1_2 =
+      new androidx.room.migration.Migration(1, 2) {
+        @Override public void migrate(@NonNull androidx.sqlite.db.SupportSQLiteDatabase db) {
+          db.execSQL("ALTER TABLE tasks ADD COLUMN executionMode TEXT NOT NULL DEFAULT ''");
+          db.execSQL("ALTER TABLE tasks ADD COLUMN endpoint TEXT NOT NULL DEFAULT ''");
+          db.execSQL("CREATE TABLE IF NOT EXISTS translation_requests (requestId TEXT NOT NULL PRIMARY KEY, taskId TEXT NOT NULL, attempts INTEGER NOT NULL, notBefore INTEGER NOT NULL, errorCode TEXT, message TEXT, FOREIGN KEY(taskId) REFERENCES tasks(taskId) ON UPDATE NO ACTION ON DELETE CASCADE)");
+          db.execSQL("CREATE INDEX IF NOT EXISTS index_translation_requests_taskId ON translation_requests(taskId)");
+        }
+      };
 
   @Entity(tableName="books") public static class BookRow {
     @PrimaryKey @NonNull public String bookId;
@@ -29,11 +39,29 @@ public abstract class LibraryDatabase extends RoomDatabase {
   @Entity(tableName="translations",primaryKeys={"paragraphId","targetLanguage"},foreignKeys=@ForeignKey(entity=ParagraphRow.class,parentColumns="paragraphId",childColumns="paragraphId",onDelete=ForeignKey.CASCADE),indices=@Index("paragraphId"))
   public static class TranslationRow {@NonNull public String paragraphId,targetLanguage,sourceLanguage,sourceHash,status; public String translatedText,provider,engineVersion,errorCode; public long updatedAt;}
   @Entity(tableName="tasks",foreignKeys=@ForeignKey(entity=ChapterRow.class,parentColumns="chapterId",childColumns="chapterId",onDelete=ForeignKey.CASCADE),indices=@Index("chapterId"))
-  public static class TaskRow {@PrimaryKey @NonNull public String taskId; @NonNull public String chapterId,sourceLanguage,targetLanguage,state; public int totalCount,successCount,failedCount; public long createdAt,updatedAt; public String errorCode,errorMessage;}
+  public static class TaskRow {
+    @PrimaryKey @NonNull public String taskId;
+    @NonNull public String chapterId,sourceLanguage,targetLanguage,state;
+    public int totalCount,successCount,failedCount;
+    public long createdAt,updatedAt;
+    public String errorCode,errorMessage;
+    @NonNull @ColumnInfo(defaultValue="''") public String executionMode = "";
+    @NonNull @ColumnInfo(defaultValue="''") public String endpoint = "";
+  }
+  @Entity(tableName="translation_requests",foreignKeys=@ForeignKey(entity=TaskRow.class,
+      parentColumns="taskId",childColumns="taskId",onDelete=ForeignKey.CASCADE),indices=@Index("taskId"))
+  public static class RequestRow {
+    @PrimaryKey @NonNull public String requestId;
+    @NonNull public String taskId;
+    public int attempts;
+    public long notBefore;
+    public String errorCode,message;
+  }
 
   @androidx.room.Dao public interface DaoAccess {
     @Query("SELECT * FROM books ORDER BY COALESCE(lastReadAt,0) DESC, importedAt DESC, bookId ASC") LiveData<List<BookRow>> observeBooks();
     @Query("SELECT * FROM books WHERE bookId=:id") BookRow book(String id);
+    @Query("SELECT * FROM chapters WHERE chapterId=:id") ChapterRow chapter(String id);
     @Insert void insertBook(BookRow row);
     @Query("DELETE FROM books WHERE bookId=:id") void deleteBook(String id);
     @Insert void insertChapters(List<ChapterRow> rows);
@@ -51,6 +79,10 @@ public abstract class LibraryDatabase extends RoomDatabase {
     @Insert(onConflict=OnConflictStrategy.REPLACE) void putProgress(ProgressRow row);
     @Query("UPDATE books SET lastReadAt=:at WHERE bookId=:id") void touchBook(String id,long at);
     @Query("SELECT * FROM tasks WHERE taskId=:id") TaskRow task(String id);
+    @Query("SELECT * FROM tasks WHERE state IN ('QUEUED','RUNNING') ORDER BY createdAt,taskId") List<TaskRow> activeTasks();
+    @Query("SELECT t.* FROM tasks t JOIN chapters c ON c.chapterId=t.chapterId WHERE c.bookId=:bookId ORDER BY t.createdAt,t.taskId") List<TaskRow> bookTasks(String bookId);
+    @Query("SELECT * FROM translation_requests WHERE requestId=:id") RequestRow request(String id);
+    @Insert(onConflict=OnConflictStrategy.REPLACE) void putRequest(RequestRow row);
     @Query("SELECT * FROM tasks WHERE chapterId=:id AND sourceLanguage=:src AND targetLanguage=:lang AND state IN ('QUEUED','RUNNING') ORDER BY createdAt DESC LIMIT 1") TaskRow activeTask(String id,String src,String lang);
     @Insert void insertTask(TaskRow row);
     @Update void updateTask(TaskRow row);

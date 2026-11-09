@@ -1,43 +1,47 @@
 # 轻阅 · BilingualReader
 
-Java + XML 的 Android EPUB 双语阅读器。A 的四阶段界面已完成，已接入 B 的真实 EPUB/Room 书库。完整交付、运行检查与边界见 [A_COMPLETE](docs/A_COMPLETE.md)。
+Java + XML 的 Android EPUB 双语阅读器。已合并 A 的页面、B 的真实 EPUB / Room 数据层，以及 C 的章节翻译任务流程。当前交付和验证见 [C 四阶段说明](docs/C_IMPLEMENTATION.md)；[A 第一阶段验收](docs/ACCEPTANCE.md)保留为历史记录。
 
-## 当前功能
+## 现在可以做什么
 
-- 导入真实 EPUB，显示书架、去重提示、目录与连续滚动原文；删除书籍。
-- 简洁文字目录，保留层级、目录锚点和继续阅读入口；每章不再使用卡片。
-- 保存本地阅读位置，重启后继续阅读；上下章边界、加载/空内容/重试提示。
-- 原文与译文按段落 ID、sourceHash 与语种匹配，显示任务进度、错误原因、失败数量、取消、继续与重试。
-- 字号 14–30sp、行距 1.2–2.0、日夜模式，设置本地保存。
-- 同段落内长按选词或选句 → 翻译 → 底部结果弹窗，支持加载、错误重试和关闭；临时查询不写入章节译文。
+- 导入 EPUB，按文件哈希去重；书架 → 目录 → 正文阅读，数据保存到 Room。
+- 上一章 / 下一章、目录定位、保存阅读位置和继续阅读。
+- 用户发起章节翻译，展示持久化进度；支持取消、重试未完成段落、成功缓存复用与启动恢复。
+- WorkManager 等待网络，串行请求；每个网络输入最多 3 次持久化尝试，支持退避及 Retry-After。
+- 批次最多 8 段 / 4000 Unicode 码点；长段落按句子或码点拆分，成功后合并到原段落 ID。
+- 字号 14–30sp、行距 1.2–2.0、日夜模式；设置使用 SharedPreferences 持久化。
+- 删除前取消该书翻译任务，迟到结果不会恢复已删除的数据。
+- 菜单“翻译服务”可配置团队 LibreTranslate 地址；首次在线翻译需确认发送原文。
 
-Debug 使用 B 的真实数据库和 C 已提供的 FakeTranslationService，经 Debug 联调协调器写入模拟译文和状态。模拟输出明确标注，不发送原文到网络；菜单可模拟下一段失败，用于验证 A 的重试界面。旧内置 DemoRepository 已不接入正常应用。
+**服务配置**：Debug 默认使用明确标注的模拟译文，适用于流程验证；Release 仅支持配置后的在线服务。尚无团队真实服务地址，因此不能宣称在线翻译质量已验收。切换服务不会覆盖已有成功译文，验证真实翻译请使用未翻译章节。APK 不包含供应商长期密钥。
 
-Release 使用真实书库，可读取保存的译文；在线翻译任务暂由 UnavailableTranslationCoordinator 给出未配置提示，等待 C 的正式 Coordinator/Worker 和团队服务地址。Debug 联调不代表在线翻译、进程中断任务恢复或翻译质量已经验收。
+**仍待完善**：EPUB 2 NCX、真实封面等 B 的兼容性工作；图1中的 TXT、视频、查词、收藏、复习和学习统计尚不属于当前 EPUB 版本。
 
 ## 启动
 
-Android Studio 打开包含 settings.gradle 的根目录，Gradle JDK 选 21，安装 Platform 35 与 Build Tools 34.0.0；选择 Debug 和安卓 8.0+ 设备运行。local.properties 填本机 SDK 路径。
+1. Android Studio 打开本目录（包含 `settings.gradle`），不是只打开 `app/`。
+2. Gradle JDK 选 **21**，安装 SDK Platform 35 与 Build Tools 34.0.0，完成 Gradle Sync。
+3. Build Variant 选 `debug`，连接安卓 8.0+ 手机或模拟器，点击 Run。
 
 ```powershell
-.\gradlew.bat :app:assembleDebug :app:lintDebug
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:lintDebug
 ```
 
-Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。
-若依赖下载超时，请检查本机 Gradle 用户目录的代理配置；不要将个人代理配置或路径提交到仓库。
+Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。首次同步需要下载构建工具和依赖。
+本机路径只放 `local.properties`，已忽略；不要提交 SDK、密钥或缓存。
 
-## 协作与验证
+## 团队入口
 
-| 文档 | 内容 |
+| 说明 | 文件 |
 |---|---|
-| [A 完整交付](docs/A_COMPLETE.md) | 四阶段完成项、当前组装、测试与 C 后续接线 |
-| [目录说明](docs/DIRECTORY_GUIDE.md) | 文件夹用途与分工 |
-| [共同规范](docs/PROJECT_SPEC.md) | 原业务字段与接口约定 |
-| [接口说明](docs/INTERFACES.md) | 源码包名与调用边界 |
-| [环境](docs/ENVIRONMENT.md) | 固定构建版本与验证记录 |
-| [翻译服务](docs/TRANSLATION_PROVIDER.md) | C 的真实适配器与服务部署边界 |
-| [选词/选句对接文档](docs/C_SELECTION_TRANSLATION.md) | 可直接转发给 C：复用现有 TranslationService 的临时查询接线与独立模拟标志 |
+| 每个文件夹做什么、成员接线步骤 | [目录与协作说明](docs/DIRECTORY_GUIDE.md) |
+| 原始共同约定（原文复制，未修改） | [项目规范](docs/PROJECT_SPEC.md) |
+| 已落地接口、包名与调用约定 | [接口对接说明](docs/INTERFACES.md) |
+| 固定工具版本、构建步骤与验证记录 | [开发环境](docs/ENVIRONMENT.md) |
+| 真实翻译服务待办 | [供应商接入模板](docs/TRANSLATION_PROVIDER.md) |
+| 点击验收与后续集成检查 | [验收步骤](docs/ACCEPTANCE.md) |
 
-当前设备集成测试位于 app/src/androidTest，验证真实 EPUB/Room 与 UI，并有独立的杀进程后续读检查；命令见 A_COMPLETE。旧 verify_phase1.py 与 phase1 截图保留作历史记录，已不适用当前真实书库入口。
+准备上传 GitHub 时提交根目录工程文件、`app/src/`、`gradle/`、Wrapper 脚本与 `docs/`；`.gitignore` 会排除 `work/`、`build/`、`local.properties`、IDE 私有配置和常见密钥文件。`gradle-wrapper.jar` 必须提交。
 
-提交源码、Gradle Wrapper、样本、测试和 docs；忽略 work/、build/、local.properties、密钥及私有书籍。共享 contract 变更先协调 B/C。本次不改变原接口字段，不直接在 UI 写 DAO 或请求供应商。
+建议分支：A `feature/ui`，B `feature/epub-data`，C `feature/translation`。先合并共享契约，再接真实数据，最后接真实翻译；不要同时改同一个 AppGraphFactory。
