@@ -10,6 +10,10 @@ import java.util.List;
 public interface BookRepository {
   ImportResult importBook(Uri sourceUri) throws AppException;
 
+  default ImportResult importBook(Uri sourceUri, String chapterRegex) throws AppException {
+    return importBook(sourceUri);
+  }
+
   LiveData<List<Book>> observeBooks();
 
   List<Chapter> getChapters(String bookId) throws AppException;

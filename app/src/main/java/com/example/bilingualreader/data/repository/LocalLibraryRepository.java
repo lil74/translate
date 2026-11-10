@@ -7,6 +7,7 @@ import android.provider.OpenableColumns;
 import android.util.Log;
 import androidx.lifecycle.*;
 import androidx.room.Room;
+import androidx.work.WorkManager;
 import com.example.bilingualreader.contract.model.*;
 import com.example.bilingualreader.contract.repository.*;
 import com.example.bilingualreader.contract.translation.*;
@@ -14,6 +15,7 @@ import com.example.bilingualreader.data.db.LibraryDatabase;
 import com.example.bilingualreader.data.db.LibraryDatabase.*;
 import com.example.bilingualreader.epub.EpubParser;
 import com.example.bilingualreader.translation.TranslationCachePolicy;
+import com.example.bilingualreader.epub.TxtParser;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
@@ -28,34 +30,89 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
   }
   public LocalLibraryRepository(Context context, LibraryDatabase database) {
     this.context=context.getApplicationContext(); this.db=database; this.dao=db.dao();
+public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationStore {
+  private static final Object IMPORT_LOCK=new Object();
+  private static final Object TASK_LOCK=new Object();
+  private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
+  public LocalLibraryRepository(Context context) {
+    this.context=context.getApplicationContext();
+    db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db").build();dao=db.dao();
+    new Thread(this::cleanupOrphans,"epub-cleanup").start();
+  }
+  private void cleanupOrphans(){
+    try{
+      Set<String> keep=new HashSet<>(dao.bookPaths());keep.addAll(dao.coverPaths());
+      long cutoff=System.currentTimeMillis()-60L*60*1000;
+      for(String folder:new String[]{"epub","covers"}){
+        File[] files=new File(context.getFilesDir(),folder).listFiles();if(files==null)continue;
+        for(File file:files)if(file.isFile()&&file.lastModified()<cutoff&&!keep.contains(file.getAbsolutePath()))file.delete();
+      }
+    }catch(RuntimeException e){Log.w("EpubImport","Orphan cleanup failed",e);}
   }
   private static AppException err(ErrorCode code,String message){return new AppException(code,message,false);}
   private String name(Uri uri) {try(Cursor c=context.getContentResolver().query(uri,null,null,null,null)){if(c!=null&&c.moveToFirst()){int col=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(col>=0)return c.getString(col);}}catch(Exception ignored){}String s=uri.getLastPathSegment();return s==null?"Imported book.epub":s;}
   public ImportResult importBook(Uri uri) throws AppException {
+    return importBook(uri,null);
+  }
+  public ImportResult importBook(Uri uri,String chapterRegex) throws AppException {
+    synchronized(IMPORT_LOCK){return importBookLocked(uri,chapterRegex);}
+  }
+  private ImportResult importBookLocked(Uri uri,String chapterRegex) throws AppException {
+    String filename=name(uri);
+    String mime=context.getContentResolver().getType(uri);
+    boolean txt=filename.toLowerCase(Locale.ROOT).endsWith(".txt") || "text/plain".equals(mime);
+    if(!txt && !filename.toLowerCase(Locale.ROOT).endsWith(".epub") && !"application/epub+zip".equals(mime) && !"application/octet-stream".equals(mime))
+      throw err(ErrorCode.UNSUPPORTED_CONTENT,"请选择 EPUB 或 TXT 文件");
+    if(!txt && chapterRegex!=null && !chapterRegex.trim().isEmpty())throw err(ErrorCode.UNSUPPORTED_CONTENT,"自定义目录规则仅适用于 TXT");
     File dir=new File(context.getFilesDir(),"epub");if(!dir.exists()&&!dir.mkdirs())throw err(ErrorCode.IMPORT_IO_ERROR,"无法创建书籍目录");
-    File temp;try{temp=File.createTempFile("import-",".epub",dir);}catch(IOException e){throw new AppException(ErrorCode.IMPORT_IO_ERROR,"无法创建导入文件",true,e);}
+    File temp;try{temp=File.createTempFile("import-",txt?".txt":".epub",dir);}catch(IOException e){throw new AppException(ErrorCode.IMPORT_IO_ERROR,"无法创建导入文件",true,e);}
+    File movedFile=null, savedCover=null;boolean committed=false;
     try {
       MessageDigest md=MessageDigest.getInstance("SHA-256");long size=0;
       try(InputStream in=context.getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(temp)) {
         if(in==null)throw err(ErrorCode.IMPORT_PERMISSION_DENIED,"无法读取所选文件");byte[] buf=new byte[8192];int n;
-        while((n=in.read(buf))!=-1){size+=n;if(size>50L*1024*1024)throw err(ErrorCode.EPUB_TOO_LARGE,"EPUB 文件超过 50 MiB");md.update(buf,0,n);out.write(buf,0,n);}
+        while((n=in.read(buf))!=-1){size+=n;if(size>50L*1024*1024)throw err(ErrorCode.EPUB_TOO_LARGE,"文件超过 50 MiB");md.update(buf,0,n);out.write(buf,0,n);}
       }
       StringBuilder h=new StringBuilder();for(byte b:md.digest())h.append(String.format(Locale.ROOT,"%02x",b&255));String id=h.toString();
       BookRow existing=dao.book(id);if(existing!=null)return new ImportResult(book(existing),true,Collections.emptyList());
-      String filename=name(uri);String fallback=filename.replaceFirst("(?i)\\.epub$","");
-      EpubParser.Result parsed=new EpubParser().parse(temp,id,fallback);
-      File dest=new File(dir,id+".epub");if(!temp.renameTo(dest))throw err(ErrorCode.IMPORT_IO_ERROR,"无法保存 EPUB 文件");
+      String fallback=filename.replaceFirst("(?i)\\.(epub|txt)$","");
+      EpubParser.Result parsed=txt?new TxtParser().parse(temp,id,fallback,chapterRegex):new EpubParser().parse(temp,id,fallback);
+      File dest=new File(dir,id+(txt?".txt":".epub"));
+      if(dest.exists()&&!dest.delete())throw err(ErrorCode.IMPORT_IO_ERROR,"无法清理上次中断的导入文件");
+      if(!temp.renameTo(dest))throw err(ErrorCode.IMPORT_IO_ERROR,"无法保存书籍文件");
+      movedFile=dest;
+      File coverFile=null;
+      if(parsed.cover!=null){
+        File covers=new File(context.getFilesDir(),"covers");
+        if(covers.isDirectory()||covers.mkdirs()){
+          coverFile=new File(covers,id+"."+parsed.coverExtension);
+          try(OutputStream out=new FileOutputStream(coverFile)){out.write(parsed.cover);}
+          catch(IOException e){coverFile.delete();coverFile=null;parsed.warnings.add("封面保存失败，使用默认封面");}
+          savedCover=coverFile;
+        }else parsed.warnings.add("封面目录不可写，使用默认封面");
+      }
       BookRow row=new BookRow();row.bookId=id;row.title=parsed.title;row.author=parsed.author;row.language=parsed.language;row.originalFileName=filename;row.localFilePath=dest.getAbsolutePath();row.chapterCount=parsed.chapters.size();row.parserVersion=1;row.importedAt=System.currentTimeMillis();
+      row.coverPath=coverFile==null?null:coverFile.getAbsolutePath();
       try {db.runInTransaction(()->{dao.insertBook(row);List<ChapterRow> cr=new ArrayList<>();for(Chapter c:parsed.chapters){ChapterRow x=new ChapterRow();x.chapterId=c.getChapterId();x.bookId=id;x.title=c.getTitle();x.resourcePath=c.getResourcePath();x.orderIndex=c.getOrderIndex();x.paragraphCount=c.getParagraphCount();cr.add(x);}dao.insertChapters(cr);List<ParagraphRow> pr=new ArrayList<>();for(Paragraph p:parsed.paragraphs){ParagraphRow x=new ParagraphRow();x.paragraphId=p.getParagraphId();x.chapterId=p.getChapterId();x.orderIndex=p.getOrderIndex();x.blockType=p.getBlockType().name();x.originalText=p.getOriginalText();x.sourceHash=p.getSourceHash();pr.add(x);}dao.insertParagraphs(pr);List<TocRow> tr=new ArrayList<>();for(TocEntry t:parsed.toc){TocRow x=new TocRow();x.tocId=t.getTocId();x.bookId=id;x.parentTocId=t.getParentTocId();x.orderIndex=t.getOrderIndex();x.title=t.getTitle();x.chapterId=t.getChapterId();x.paragraphId=t.getParagraphId();tr.add(x);}dao.insertToc(tr);});}
-      catch(RuntimeException e){dest.delete();throw new AppException(ErrorCode.DATABASE_ERROR,"保存书籍数据失败",false,e);}
+      catch(RuntimeException e){dest.delete();if(coverFile!=null)coverFile.delete();throw new AppException(ErrorCode.DATABASE_ERROR,"保存书籍数据失败",false,e);}
+      committed=true;
       return new ImportResult(book(row),false,parsed.warnings);
-    }catch(AppException e){Log.e("EpubImport", "Import failed: " + e.getCode(), e);throw e;}catch(SecurityException e){Log.e("EpubImport", "Import permission denied", e);throw new AppException(ErrorCode.IMPORT_PERMISSION_DENIED,"没有读取文件的权限",false,e);}catch(Exception e){Log.e("EpubImport", "Import I/O failed", e);throw new AppException(ErrorCode.IMPORT_IO_ERROR,"导入 EPUB 失败",true,e);}finally{temp.delete();}
+    }catch(AppException e){Log.e("BookImport", "Import failed: " + e.getCode(), e);throw e;}catch(SecurityException e){Log.e("BookImport", "Import permission denied", e);throw new AppException(ErrorCode.IMPORT_PERMISSION_DENIED,"没有读取文件的权限",false,e);}catch(Exception e){Log.e("BookImport", "Import I/O failed", e);throw new AppException(ErrorCode.IMPORT_IO_ERROR,"导入书籍失败",true,e);}finally{temp.delete();if(!committed){if(movedFile!=null)movedFile.delete();if(savedCover!=null)savedCover.delete();}}
   }
   private static Book book(BookRow r){return new Book(r.bookId,r.title,r.author,r.language,r.originalFileName,r.localFilePath,r.coverPath,r.chapterCount,r.parserVersion,r.importedAt,r.lastReadAt);}
   public LiveData<List<Book>> observeBooks(){return Transformations.map(dao.observeBooks(),rows->{List<Book> out=new ArrayList<>();for(BookRow r:rows)out.add(book(r));return out;});}
   public List<Chapter> getChapters(String id)throws AppException{if(dao.book(id)==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");List<Chapter> out=new ArrayList<>();for(ChapterRow r:dao.chapters(id))out.add(new Chapter(r.chapterId,r.bookId,r.title,r.orderIndex,r.resourcePath,r.paragraphCount));return out;}
   public List<TocEntry> getTableOfContents(String id)throws AppException{if(dao.book(id)==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");List<TocEntry> out=new ArrayList<>();for(TocRow r:dao.toc(id))out.add(new TocEntry(r.tocId,r.bookId,r.parentTocId,r.orderIndex,r.title,r.chapterId,r.paragraphId));return out;}
-  public void deleteBook(String id)throws AppException{BookRow row=dao.book(id);if(row==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");db.runInTransaction(()->dao.deleteBook(id));new File(row.localFilePath).delete();}
+  public void deleteBook(String id)throws AppException{
+    BookRow row=dao.book(id);if(row==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");
+    try{
+      for(ChapterRow chapter:dao.chapters(id))
+        WorkManager.getInstance(context).cancelUniqueWork("translate:"+chapter.chapterId+":en:zh-CN").getResult().get();
+    }catch(Exception e){throw new AppException(ErrorCode.DATABASE_ERROR,"停止翻译任务失败，书籍未删除",true,e);}
+    db.runInTransaction(()->dao.deleteBook(id));
+    if(!new File(row.localFilePath).delete())Log.w("EpubImport","Deleted book has an orphan source file");
+    if(row.coverPath!=null&&!new File(row.coverPath).delete())Log.w("EpubImport","Deleted book has an orphan cover file");
+  }
   public LiveData<List<ParagraphItem>> observeParagraphs(String chapterId,String lang){
     LiveData<List<ParagraphRow>> paragraphs=dao.observeParagraphRows(chapterId);
     LiveData<List<TranslationRow>> translations=dao.observeTranslationRows(chapterId,lang);
@@ -69,6 +126,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
       List<ParagraphItem> out=new ArrayList<>();
       for(ParagraphRow p:rows){
         TranslationRow t=byId.get(p.paragraphId);
+        if(t!=null&&(!p.sourceHash.equals(t.sourceHash)||!"en".equals(t.sourceLanguage)))t=null;
         Paragraph model=new Paragraph(p.paragraphId,p.chapterId,p.orderIndex,BlockType.valueOf(p.blockType),p.originalText,p.sourceHash);
         Translation translation=t==null?null:new Translation(t.paragraphId,t.targetLanguage,t.sourceLanguage,t.sourceHash,t.translatedText,TranslationStatus.valueOf(t.status),t.provider,t.engineVersion,t.errorCode,t.updatedAt);
         out.add(new ParagraphItem(model,translation));
