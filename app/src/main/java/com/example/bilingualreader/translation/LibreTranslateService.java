@@ -11,6 +11,14 @@ import java.util.*;
 /** Blocking adapter for a team-owned, keyless LibreTranslate endpoint. Call off the UI thread. */
 public final class LibreTranslateService implements TranslationService {
   private final URL endpoint;
+  private volatile HttpURLConnection activeConnection;
+  private volatile boolean cancelled;
+
+  public void cancel() {
+    cancelled = true;
+    HttpURLConnection current = activeConnection;
+    if (current != null) current.disconnect();
+  }
 
   public LibreTranslateService(String endpoint) throws MalformedURLException {
     this.endpoint = new URL(endpoint);
@@ -30,7 +38,7 @@ public final class LibreTranslateService implements TranslationService {
     List<TranslationOutput> outputs = new ArrayList<>();
     // The provider returns text only: bind each individual call to its original ID locally.
     for (TranslationInput item : request.getItems()) {
-      if (Thread.currentThread().isInterrupted()) {
+      if (cancelled || Thread.currentThread().isInterrupted()) {
         throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译验证已中断", false);
       }
       outputs.add(new TranslationOutput(item.getParagraphId(), item.getSourceHash(),
@@ -44,6 +52,8 @@ public final class LibreTranslateService implements TranslationService {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
+      activeConnection = connection;
+      if (cancelled) throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译已停止", false);
       connection.setInstanceFollowRedirects(false);
       connection.setConnectTimeout(10000);
       connection.setReadTimeout(30000);
@@ -63,6 +73,10 @@ public final class LibreTranslateService implements TranslationService {
         ErrorCode code = status == 401 || status == 403 ? ErrorCode.AUTH_FAILED
             : status == 429 ? ErrorCode.RATE_LIMITED
             : status >= 500 ? ErrorCode.NETWORK_ERROR : ErrorCode.TRANSLATION_FAILED;
+        if (status == 429 || status == 503) {
+          throw new RetryAfterException(code, "翻译服务繁忙，稍后自动重试（HTTP " + status + "）",
+              retryAfter(connection.getHeaderField("Retry-After"), System.currentTimeMillis()));
+        }
         throw new AppException(code, "翻译服务请求失败（HTTP " + status + "）",
             status == 429 || status >= 500);
       }
@@ -89,8 +103,21 @@ public final class LibreTranslateService implements TranslationService {
     } catch (JsonParseException | IllegalStateException malformed) {
       throw invalid();
     } finally {
+      activeConnection = null;
       if (connection != null) connection.disconnect();
     }
+  }
+
+  public static long retryAfter(String header, long now) {
+    if (header == null) return 0;
+    try {
+      long seconds = Long.parseLong(header.trim());
+      return seconds <= 0 ? now : Math.addExact(now, Math.multiplyExact(seconds, 1000L));
+    } catch (NumberFormatException date) {
+      try { return java.time.ZonedDateTime.parse(header.trim(),
+          java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli(); }
+      catch (java.time.format.DateTimeParseException invalid) { return 0; }
+    } catch (ArithmeticException overflow) { return Long.MAX_VALUE; }
   }
 
   private AppException invalid() {

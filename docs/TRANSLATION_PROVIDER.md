@@ -1,6 +1,6 @@
-# C 第一阶段翻译服务选型与边界
+# 翻译服务配置与运行边界
 
-日期：2026-11-02。首个可替换适配器选用 LibreTranslate，团队自建、不需要供应商长期密钥的实例。此选型用于验证 Java 请求链路，不代表实例已经部署或在线质量已经通过验收。
+更新：2026-11-07。当前使用 LibreTranslate 适配器，面向团队自建、不需要供应商长期密钥的实例。章节任务、Worker 和页面已接入；尚无团队服务地址，不代表在线引擎可用性或质量已经验收。完整交付见 [C_IMPLEMENTATION.md](C_IMPLEMENTATION.md)。
 
 ## 官方依据
 
@@ -12,23 +12,23 @@
 
 `new LibreTranslateService("https://团队域名/translate")` 实现既有 TranslationService。通过构造方法传完整 URL，不在应用里写死公网服务地址。只支持无需 API Key 的自建实例，不接受或保存长期密钥。团队付费服务应另加服务端代理适配器，当前代码不声称已经实现代理。
 
-供应商仅返回译文、不返回段落 ID。因此每个输入单独串行请求，使用当前输入的 paragraphId/sourceHash 生成 TranslationOutput，绝不猜测网络列表顺序。最终经过 TranslationValidation 检查，再交给后续的 TranslationStore。适配器不写数据库。
+适配器选择逐段串行请求，因为供应商响应没有项目的段落 ID；使用当前输入的 paragraphId/sourceHash 生成 TranslationOutput，绝不猜测网络列表顺序。结果经过 TranslationValidation 检查，由 Runner 通过现有 TranslationStore 写入 Room。适配器不直接写数据库。
 
 - 应用批次上限为 8 段 / 4000 Unicode 码点，不是供应商官方限额。
 - 连接超时 10 秒、读取超时 30 秒；响应最大 1 MiB；拒绝重定向。
 - HTTP 401/403 → AUTH_FAILED；429 → RATE_LIMITED；5xx → NETWORK_ERROR；其他非 200 → TRANSLATION_FAILED。供应商尚未给出稳定的额度错误结构，因此未把所有 403 或 400 猜成 QUOTA_EXCEEDED。
 - 超时 → TIMEOUT；连接失败 → NETWORK_ERROR；空译文、非字符串或无效 JSON → INVALID_RESPONSE。
-- 第一阶段将失败抛给调用方，尚不自动重试、不承诺部分结果落库、不处理 Retry-After。第二阶段再与调度、持久化尝试次数及取消协调。
-- 正常应用端仅 HTTPS；本机 JVM 测试允许 localhost/127.0.0.1 HTTP，未放开 Android 全局明文网络。
+- Runner 对暂时错误退避，每个输入最多 3 次持久化尝试；HTTP 429 / 503 的 Retry-After 支持秒数和 HTTP 日期。等待期间不会消耗次数。鉴权 / 额度问题终止任务，成功缓存保留。
+- Release 仅 HTTPS；Debug 与 JVM 测试额外允许 localhost/127.0.0.1 HTTP，未放开 Android 全局明文网络。停止 Worker 会断开当前连接。
 
 ## 上线前需确认
 
 自建需要模型与计算资源；实际单请求上限、并发、费用、限流由部署者配置并记录。当前没有实际实例，不能给出已经验证的吞吐量或费用。不要把免费公开镜像当成稳定服务。若转用托管实例，应重新验证其费用、限额与认证并通过代理保存付费密钥。
 
-首次从 App 启用真实服务时，A 需要告知用户“原文会发送到团队翻译服务”，用户主动点击后发起；本次未接入页面，未自动发送该 EPUB 到任何公网服务。日志仅保留错误码，不打印正文、响应体或密钥。
+已在 App 菜单增加“翻译服务”设置；首次向新地址在线翻译时会显示发送原文的确认，用户主动确认后才创建任务。任务保存配置快照，恢复时不会擅自切换服务。日志仅保留错误码，不打印正文、响应体或密钥。本次未将该 EPUB 发送到公网服务。
 
 ## 验证记录
 
 已通过本地参考译文的 ID 对应验证和本机 HTTP 协议桩测试。协议桩返回预置参考文本，不是 LibreTranslate 引擎，不可作为翻译质量验收。
 
-实际在线验证命令见 `C_PHASE1.md`；提供可用的团队实例后，使用 `--endpoint` 复用同一 EPUB 样本生成真实译文，并由 C 人工检查语义、专名和简体中文输出。
+提供可用的团队实例后，可在 App 配置地址并打开未翻译章节，或用 `tools/verify_translation.py --endpoint` 复用第一阶段样本验证实际返回。需要人工检查语义、专名和简体中文输出；默认模拟结果不能替代此项。

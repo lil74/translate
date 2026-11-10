@@ -74,10 +74,11 @@ def main():
     stub.write_text('package androidx.annotation; public @interface Nullable {}', encoding='utf-8')
     package = ROOT/'app/src/main/java/com/example/bilingualreader'
     sources = [package/'contract/model'/f'{name}.java'
-               for name in ['AppException', 'ErrorCode', 'TranslationStatus']]
+               for name in ['AppException', 'ErrorCode', 'TranslationStatus', 'Paragraph', 'BlockType']]
     sources += [p for p in (package/'contract/translation').glob('*.java')
                 if p.name != 'TranslationCoordinator.java']
-    sources += list((package/'translation').glob('*.java'))
+    sources += [package/'translation'/f'{name}.java' for name in
+                ['TranslationValidation', 'LibreTranslateService', 'RetryAfterException', 'TranslationBatcher']]
     sources += [ROOT/'app/src/debug/java/com/example/bilingualreader/translation/FakeTranslationService.java',
                 ROOT/'tools/java/TranslationM1Check.java', stub]
     subprocess.run(['javac', '-encoding', 'UTF-8', '-cp', str(gson), '-d', str(work),

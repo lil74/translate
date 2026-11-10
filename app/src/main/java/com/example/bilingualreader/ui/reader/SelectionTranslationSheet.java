@@ -44,7 +44,8 @@ public final class SelectionTranslationSheet extends BottomSheetDialogFragment {
                 new ViewModelProvider.Factory() {
                   @NonNull
                   public <T extends ViewModel> T create(@NonNull Class<T> type) {
-                    return type.cast(new SelectionTranslationViewModel(graph.selectionTranslation));
+                    AppContainer.SelectionBinding binding = graph.selectionBinding();
+                    return type.cast(new SelectionTranslationViewModel(binding.service, binding.demo));
                   }
                 })
             .get(SelectionTranslationViewModel.class);
@@ -52,7 +53,7 @@ public final class SelectionTranslationSheet extends BottomSheetDialogFragment {
     ((TextView) view.findViewById(R.id.selection_source)).setText(selected);
     ((TextView) view.findViewById(R.id.selection_notice))
         .setText(
-            graph.selectionDemo
+            vm.demo
                 ? R.string.selection_mock_notice
                 : R.string.selection_online_notice);
     Button retry = view.findViewById(R.id.selection_retry);
@@ -78,7 +79,7 @@ public final class SelectionTranslationSheet extends BottomSheetDialogFragment {
               dismiss();
             });
     if (vm.result.getValue() == null) {
-      if (graph.selectionDemo) vm.translate(selected);
+      if (vm.demo) vm.translate(selected);
       else {
         ((TextView) view.findViewById(R.id.selection_result))
             .setText(R.string.selection_online_notice);

@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-07",
+  "scope": "C translation pipeline",
+  "jvm": {
+    "suite": "ChapterTranslationRunnerTest",
+    "tests": 13,
+    "failures": 0,
+    "errors": 0,
+    "report": "app/build/reports/tests/testDebugUnitTest/index.html"
+  },
+  "android": {
+    "suite": "TranslationPersistenceTest",
+    "deviceApi": 36,
+    "tests": 9,
+    "passed": true,
+    "checks": [
+      "emptyChapterCompletesWithoutNetwork",
+      "roomCachesSuccessAndCountsIdempotently",
+      "durableBudgetAndServiceSnapshotSurviveDatabaseReopen",
+      "workManagerTranslatesAnImportedBookAndCacheAvoidsSecondRequest",
+      "sourceHashMismatchRollsBackWholeBatch",
+      "cancelDuringRequestRejectsLateResponseAndResumes",
+      "schemaOneUpgradePreservesBooksProgressTasksAndTranslations",
+      "duplicateClicksHaveOneActiveTaskAcrossRepositoryInstances",
+      "deletingBookRejectsLateWritesAndCascadesAttempts"
+    ],
+    "report": "work/c-android-results/result.json",
+    "limitation": "Executed before the final mixed-success/quota-response change; that change passed its added JVM test. No additional APK installation was scheduled after the user requested no packaging."
+  },
+  "epubProtocolProbe": {
+    "checks": 33,
+    "passed": true,
+    "realTranslationEngine": false,
+    "report": "work/translation-m1/report.md"
+  },
+  "lint": { "errors": 0, "warnings": 49 },
+  "debugBuild": "passed",
+  "releaseBuild": "passed",
+  "onlineProviderConfigured": false,
+  "onlineTranslationQualityVerified": false,
+  "notes": "Raw machine-specific reports and EPUB excerpts remain ignored under work/ or build/. No public service received the provided EPUB."
+}

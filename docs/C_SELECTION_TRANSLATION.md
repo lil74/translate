@@ -1,10 +1,12 @@
 # 给 C：同段落选词 / 选句翻译对接说明
 
+> 2026-11-09 C 接入更新：已按本文统一现有代码。保留原五参数和本文七参数构造方法，并用九参数入口同时接入 C 的任务存储与配置。选词服务通过独立适配器调用复用的 TranslationService；服务设置变化后对新弹窗生效，已打开弹窗保留原服务与模拟标志，确保确认后不会改变发送目标。见 [本轮统一记录](C_SELECTION_UNIFICATION.md)。原 A 的设备验证记录保留其原始日期，本轮没有生成或安装 APK。
+
 本轮已实现 A 的“长按原文 → 调整选择范围 → 点击翻译 → 底部结果弹窗”。只支持同一个原文段落内选择。单词、短语和句子使用同一条查询路径，不提供词典音标、词性或语境消歧承诺。
 
 ## C 需要做什么
 
-**复用已有 TranslationService，无需新增 HTTP 接口、共享模型、数据库表或修改整章翻译接口。** 请将一个可用的、适合短文本查询的 TranslationService 实现接到 `AppContainer.selectionTranslation`。目前 Debug 使用已有 FakeTranslationService，Release 默认 UnconfiguredSelectionService，正式服务尚待 C 配置。
+**复用已有 TranslationService，无需新增 HTTP 接口、共享模型、数据库表或修改整章翻译接口。** 当前两个 Factory 均已接入 `AppContainer.selectionTranslation`：Debug 默认使用已有 FakeTranslationService，配置在线模式后使用 LibreTranslateService；Release 只使用在线模式，未配置地址时给出明确提示。真实服务地址与质量仍待团队配置和验收。
 
 新 AppContainer 七参数构造方法：
 

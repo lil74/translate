@@ -13,6 +13,7 @@ import java.util.concurrent.*;
 public final class SelectionTranslationViewModel extends ViewModel {
   public final MutableLiveData<UiState<String>> result = new MutableLiveData<>();
   private final TranslationService service;
+  public final boolean demo;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final Handler main = new Handler(Looper.getMainLooper());
   private Future<?> pending;
@@ -20,7 +21,12 @@ public final class SelectionTranslationViewModel extends ViewModel {
   private boolean cleared;
 
   public SelectionTranslationViewModel(TranslationService service) {
-    this.service = service;
+    this(service, false);
+  }
+
+  public SelectionTranslationViewModel(TranslationService service, boolean demo) {
+    this.service = Objects.requireNonNull(service);
+    this.demo = demo;
   }
 
   public void translate(String selected) {

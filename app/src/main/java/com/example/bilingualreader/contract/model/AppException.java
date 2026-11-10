@@ -1,6 +1,6 @@
 package com.example.bilingualreader.contract.model;
 
-public final class AppException extends Exception {
+public class AppException extends Exception {
   private final ErrorCode code;
   private final String userMessage;
   private final boolean retryable;
