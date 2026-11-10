@@ -34,14 +34,18 @@ public abstract class LibraryDatabase extends RoomDatabase {
   @androidx.room.Dao public interface DaoAccess {
     @Query("SELECT * FROM books ORDER BY COALESCE(lastReadAt,0) DESC, importedAt DESC, bookId ASC") LiveData<List<BookRow>> observeBooks();
     @Query("SELECT * FROM books WHERE bookId=:id") BookRow book(String id);
+    @Query("SELECT localFilePath FROM books") List<String> bookPaths();
+    @Query("SELECT coverPath FROM books WHERE coverPath IS NOT NULL") List<String> coverPaths();
     @Insert void insertBook(BookRow row);
     @Query("DELETE FROM books WHERE bookId=:id") void deleteBook(String id);
     @Insert void insertChapters(List<ChapterRow> rows);
     @Insert void insertParagraphs(List<ParagraphRow> rows);
     @Insert void insertToc(List<TocRow> rows);
     @Query("SELECT * FROM chapters WHERE bookId=:id ORDER BY orderIndex") List<ChapterRow> chapters(String id);
+    @Query("SELECT * FROM chapters WHERE chapterId=:id") ChapterRow chapter(String id);
     @Query("SELECT * FROM toc WHERE bookId=:id ORDER BY orderIndex") List<TocRow> toc(String id);
     @Query("SELECT * FROM paragraphs WHERE chapterId=:id ORDER BY orderIndex") List<ParagraphRow> paragraphs(String id);
+    @Query("SELECT * FROM paragraphs WHERE paragraphId=:id") ParagraphRow paragraph(String id);
     @Query("SELECT * FROM paragraphs WHERE chapterId=:id ORDER BY orderIndex") LiveData<List<ParagraphRow>> observeParagraphRows(String id);
     @Query("SELECT t.* FROM translations t JOIN paragraphs p ON p.paragraphId=t.paragraphId WHERE p.chapterId=:id AND t.targetLanguage=:lang") LiveData<List<TranslationRow>> observeTranslationRows(String id,String lang);
     @Query("SELECT p.* FROM paragraphs p JOIN chapters c ON p.chapterId=c.chapterId WHERE c.bookId=:id ORDER BY c.orderIndex,p.orderIndex") List<ParagraphRow> bookParagraphs(String id);

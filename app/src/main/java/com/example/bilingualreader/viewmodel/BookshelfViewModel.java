@@ -21,9 +21,13 @@ public final class BookshelfViewModel extends BaseViewModel {
   }
 
   public void importBook(Uri uri) {
+    importBook(uri,null);
+  }
+
+  public void importBook(Uri uri,String chapterRegex) {
     execute(
         () -> {
-          ImportResult result = graph.books.importBook(uri);
+          ImportResult result = graph.books.importBook(uri,chapterRegex);
           return (result.isAlreadyExists() ? "书籍已在书架" : "导入成功")
               + (result.getWarnings().isEmpty()
                   ? ""
