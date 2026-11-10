@@ -1,5 +1,20 @@
 # 工程目录与分工说明
 
+## 2026-11-08 当前接线补充
+
+最新功能与验证以 A_COMPLETE.md 为准；下文最初骨架描述保留作背景。
+
+| 文件 | 当前用途 |
+|---|---|
+| `ui/toc/TocAdapter.java`、`res/layout/item_toc.xml` | 目录专用纯文字列表、层级缩进、分隔线；与书架卡片分离 |
+| `debug/.../debug/StoreDemoCoordinator.java` | A 的 Debug 集成夹具，用真实导入书籍 ID，调用 C 的 FakeTranslationService，经 B 的 TranslationStore 保存状态和模拟输出 |
+| `di/TranslationDiagnostics.java` | 可选 Debug 故障注入接口，主 Activity 仅对实现此接口的协调器显示联调菜单 |
+| `translation/UnavailableTranslationCoordinator.java` | Release 在 C 的正式调度器未接入时给出明确提示，并观察已有本地结果 |
+| `src/androidTest/` | 真实 EPUB/Room/UI 集成检查与跨进程续读检查，含原创样本 |
+| `docs/screenshots/a-complete/` | 本轮实际模拟器截图 |
+
+两个 AppGraphFactory 均已连接 LocalLibraryRepository；旧 DemoRepository 不再用于普通 Debug 入口。完整模型/接口未变，B/C 的源文件未在此轮修改。
+
 ## 根目录
 
 | 路径 | 用途 | 维护者 |

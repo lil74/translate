@@ -1,0 +1,4 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="?attr/selectableItemBackground" android:minHeight="56dp" android:gravity="center_vertical">
+<TextView android:id="@+id/toc_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="16dp" android:paddingEnd="12dp" android:textSize="17sp" android:textColor="@color/ink"/>
+<View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/soft"/>
+</LinearLayout>

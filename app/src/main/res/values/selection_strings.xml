@@ -1,0 +1,8 @@
+<resources>
+<string name="translate_selection">翻译</string><string name="selection_title">选词 / 选句翻译</string>
+<string name="selection_loading">正在翻译所选内容…</string><string name="selection_retry">重试</string>
+<string name="selection_close">关闭</string><string name="selection_confirm">翻译所选内容</string>
+<string name="selection_online_notice">点击翻译后，所选文字将发送到团队翻译服务。</string>
+<string name="selection_mock_notice">当前为模拟翻译，仅用于验证操作流程。</string>
+<string name="selection_hint">长按原文选择单词或句子，再点击“翻译”</string>
+</resources>

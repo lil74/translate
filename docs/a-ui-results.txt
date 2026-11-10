@@ -1,0 +1,36 @@
+INSTRUMENTATION_STATUS: stream=PASS: Real EPUB import, duplicate import, and Room-backed bookshelf
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Real TOC uses plain rows with hierarchy and no chapter cards
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Real original paragraphs are displayed in chapter order
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Failed task shows reason and a retry entry
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Retry uses the same paragraph IDs and persisted labelled fake results
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Chapter state isolation and explicit cancellation
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Return saves visible paragraph and second-chapter reading progress
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS: Settings UI saves font size and line spacing
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: passed=8
+INSTRUMENTATION_RESULT: stream=Real EPUB import, duplicate import, and Room-backed bookshelf
+Real TOC uses plain rows with hierarchy and no chapter cards
+Real original paragraphs are displayed in chapter order
+Failed task shows reason and a retry entry
+Retry uses the same paragraph IDs and persisted labelled fake results
+Chapter state isolation and explicit cancellation
+Return saves visible paragraph and second-chapter reading progress
+Settings UI saves font size and line spacing
+ALL PASSED
+
+INSTRUMENTATION_CODE: -1
