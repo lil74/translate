@@ -1,8 +1,15 @@
 package com.example.bilingualreader.ui.bookshelf;
 
 import android.os.Bundle;
+import android.net.Uri;
+import android.database.Cursor;
+import android.provider.OpenableColumns;
+import android.text.InputType;
 import android.view.View;
 import android.widget.*;
+import java.util.Locale;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.*;
@@ -19,7 +26,10 @@ public final class BookshelfFragment extends BaseFragment {
       registerForActivityResult(
           new ActivityResultContracts.OpenDocument(),
           uri -> {
-            if (uri != null) vm.importBook(uri);
+            if (uri != null) {
+              if (isTxt(uri)) showTxtImport(uri);
+              else vm.importBook(uri);
+            }
           });
 
   public BookshelfFragment() {
@@ -32,8 +42,11 @@ public final class BookshelfFragment extends BaseFragment {
     vm = models().get(BookshelfViewModel.class);
     commands(vm);
     ((TextView) view.findViewById(R.id.mode_banner))
-        .setText(
-            graph().demo ? "本地书库 · 导入 EPUB 开始阅读\n当前使用模拟翻译，不会发送原文到网络。" : "本地书库 · 书籍与阅读位置保存在此设备");
+        .setText("导入 EPUB/TXT 开始阅读 · 翻译本章可生成逐段译文\n"
+            + (graph().demo || graph().translationConfig != null
+                && com.example.bilingualreader.translation.TranslationConfigStore.MOCK.equals(graph().translationConfig.mode())
+                ? "当前为模拟验证，译文有明确标记；可在右上角配置在线服务。"
+                : "在线翻译服务可在右上角菜单中配置。"));
     EntryAdapter<Book> adapter =
         new EntryAdapter<>(
             new EntryAdapter.Presenter<Book>() {
@@ -85,7 +98,45 @@ public final class BookshelfFragment extends BaseFragment {
         });
     view.findViewById(R.id.import_book)
         .setOnClickListener(
-            v -> picker.launch(new String[] {"application/epub+zip", "application/octet-stream"}));
+            v -> picker.launch(new String[] {"application/epub+zip", "text/plain", "application/octet-stream"}));
+  }
+
+  private boolean isTxt(Uri uri) {
+    String mime=requireContext().getContentResolver().getType(uri);
+    if ("text/plain".equals(mime)) return true;
+    try (Cursor cursor=requireContext().getContentResolver().query(uri,null,null,null,null)) {
+      if (cursor!=null && cursor.moveToFirst()) {
+        int column=cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+        if (column>=0) return cursor.getString(column).toLowerCase(Locale.ROOT).endsWith(".txt");
+      }
+    } catch (RuntimeException ignored) { }
+    return uri.getLastPathSegment()!=null && uri.getLastPathSegment().toLowerCase(Locale.ROOT).endsWith(".txt");
+  }
+
+  private void showTxtImport(Uri uri) {
+    EditText input=new EditText(requireContext());
+    input.setHint("例如：^第[一二三四五六七八九十\\d]+章.*$");
+    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+    input.setMinLines(2);
+    int padding=(int)(20*getResources().getDisplayMetrics().density);
+    input.setPadding(padding,padding,padding,padding);
+    androidx.appcompat.app.AlertDialog dialog=new MaterialAlertDialogBuilder(requireContext())
+        .setTitle("TXT 目录识别")
+        .setMessage("留空使用内置章节规则。也可填写 Java 正则表达式匹配整行章节标题；第一个捕获组可作为目录名称。")
+        .setView(input)
+        .setNegativeButton("取消",null)
+        .setPositiveButton("导入",null)
+        .create();
+    dialog.setOnShowListener(ignored -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+      String regex=input.getText().toString().trim();
+      if (!regex.isEmpty()) {
+        if (regex.length()>300) {input.setError("正则表达式不能超过 300 字符");return;}
+        try {Pattern.compile(regex);} catch (PatternSyntaxException e) {input.setError("正则表达式无效："+e.getDescription());return;}
+      }
+      vm.importBook(uri,regex);
+      dialog.dismiss();
+    }));
+    dialog.show();
   }
 
   @Override

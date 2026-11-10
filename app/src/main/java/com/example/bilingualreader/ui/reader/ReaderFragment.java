@@ -9,6 +9,7 @@ import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.*;
 import com.example.bilingualreader.R;
 import com.example.bilingualreader.contract.model.*;
+import com.example.bilingualreader.translation.TranslationConfigStore;
 import com.example.bilingualreader.ui.*;
 import com.example.bilingualreader.viewmodel.*;
 
@@ -204,7 +205,7 @@ public final class ReaderFragment extends BaseFragment {
     if (t == null) return getString(R.string.reader_translate_action);
     switch (t.getState()) {
       case COMPLETED:
-        return "使用已有译文";
+        return getString(R.string.reader_translate_action);
       case CANCELLED:
         return "继续翻译";
       case FAILED:
@@ -221,7 +222,7 @@ public final class ReaderFragment extends BaseFragment {
     if (t != null) {
       switch (t.getState()) {
         case QUEUED:
-          label = "等待翻译";
+          label = t.getErrorMessage() == null ? "等待网络或开始翻译" : t.getErrorMessage();
           break;
         case RUNNING:
           label = "正在翻译";
@@ -240,7 +241,10 @@ public final class ReaderFragment extends BaseFragment {
       label += " · " + t.getSuccessCount() + " / " + t.getTotalCount();
       if (t.getFailedCount() > 0) label += " · 失败 " + t.getFailedCount();
     }
-    return graph().demo ? "模拟演示 · " + label : label;
+    TranslationConfigStore config = graph().translationConfig;
+    boolean demo =
+        config == null ? graph().demo : TranslationConfigStore.MOCK.equals(config.mode());
+    return demo ? "模拟验证 · " + label : label;
   }
 
   /** The compact toolbar icon opens text actions and the latest progress only on demand. */
@@ -255,14 +259,7 @@ public final class ReaderFragment extends BaseFragment {
         item -> {
           if (item.getItemId() == R.id.translate) {
             remember();
-            if (graph().demo) vm.translate();
-            else
-              new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                  .setTitle("翻译当前章节")
-                  .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
-                  .setNegativeButton("暂不翻译", null)
-                  .setPositiveButton("继续", (dialog, which) -> vm.translate())
-                  .show();
+            requestChapterTranslation();
             return true;
           }
           if (item.getItemId() == R.id.cancel) {
@@ -277,6 +274,34 @@ public final class ReaderFragment extends BaseFragment {
         });
     popup.show();
     return popup;
+  }
+
+  private void requestChapterTranslation() {
+    TranslationConfigStore config = graph().translationConfig;
+    if (config == null && !graph().demo) {
+      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle("翻译当前章节")
+          .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
+          .setNegativeButton("暂不翻译", null)
+          .setPositiveButton("继续", (dialog, which) -> vm.translate())
+          .show();
+    } else if (config != null && config.needsConsent()) {
+      String endpoint = config.endpoint();
+      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle("发送本章原文用于翻译？")
+          .setMessage("本章英语原文会发送到：\n" + endpoint + "\n\n译文会保存在手机中。请确认你同意向该服务发送原文。")
+          .setNegativeButton("取消", null)
+          .setPositiveButton(
+              "同意并翻译",
+              (dialog, which) -> {
+                if (TranslationConfigStore.ONLINE.equals(config.mode())
+                    && endpoint.equals(config.endpoint())) {
+                  config.consent(endpoint);
+                  vm.translate();
+                }
+              })
+          .show();
+    } else vm.translate();
   }
 
   private void populateTranslationMenu(Menu menu) {

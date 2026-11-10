@@ -2,11 +2,13 @@
 
 本轮已实现 A 的“长按原文 → 调整选择范围 → 点击翻译 → 结果浮窗”。2026-11-10 已将固定底部面板调整为不使原文变暗的可拖动小窗，此 UI 调整不改变任何 C 接口。只支持同一个原文段落内选择。单词、短语和句子使用同一条查询路径，不提供词典音标、词性或语境消歧承诺。
 
-## C 需要做什么
+> C 接入更新：保留原五参数和本文七参数构造方法，并用九参数入口同时接入 C 的任务存储与配置。选词服务通过独立适配器调用复用的 TranslationService；服务设置变化后对新浮窗生效，已打开浮窗保留原服务与模拟标志，确保确认后不会改变发送目标。见 [统一记录](C_SELECTION_UNIFICATION.md)。原 A 的设备验证记录保留其原始日期；真实服务运行记录见 [2026-11-10 真实运行](REAL_TRANSLATION_RUN_2026-11-10.md)。
 
-**复用已有 TranslationService，无需新增 HTTP 接口、共享模型、数据库表或修改整章翻译接口。** 请将一个可用的、适合短文本查询的 TranslationService 实现接到 `AppContainer.selectionTranslation`。目前 Debug 使用已有 FakeTranslationService，Release 默认 UnconfiguredSelectionService，正式服务尚待 C 配置。
+## C 接入方式
 
-新 AppContainer 七参数构造方法：
+**复用已有 TranslationService，无需新增 HTTP 接口、共享模型、数据库表或修改整章翻译接口。** 当前两个 Factory 均已接入 `AppContainer.selectionTranslation`：Debug 默认使用已有 FakeTranslationService，配置在线模式后使用 LibreTranslateService；Release 只使用在线模式，未配置地址时给出明确提示。真实服务已有短篇样本运行记录，完整小说质量仍需验收；每台设备需配置可访问的地址。
+
+兼容的 AppContainer 七参数构造方法如下；当前生产接线使用九参数入口，额外传入任务存储与服务配置：
 
 ```java
 new AppContainer(
@@ -54,7 +56,7 @@ C 返回同一个 taskId/requestId/paragraphId/sourceHash，provider 非空。�
 | 文件 | 作用 |
 |---|---|
 | ui/reader/ParagraphAdapter.java | 原生段内选择菜单，捕获实际选择范围 |
-| ui/reader/SelectionTranslationSheet.java | 底部弹窗、所选原文、结果、加载、错误重试、真实服务发送确认 |
+| ui/reader/SelectionTranslationSheet.java | 可拖动浮窗、所选原文、结果、加载、错误重试、真实服务发送确认 |
 | viewmodel/SelectionTranslationViewModel.java | 临时请求组装、响应校验、取消、迟到结果隔离 |
 | di/AppContainer.java | selectionTranslation 与 selectionDemo 两个独立接入字段 |
 | translation/UnconfiguredSelectionService.java | 未配置真实服务时的明确提示 |
@@ -64,7 +66,7 @@ C 返回同一个 taskId/requestId/paragraphId/sourceHash，provider 非空。�
 ## 联调步骤
 
 1. Debug 启动并导入 EPUB，长按原文、拖动选择柄，点击“翻译”。应显示当前选中的单词或句子，模拟结果明确标注。
-2. C 接入真实实例，设 selectionDemo=false。打开弹窗时不自动发送，点击“翻译所选内容”后才请求。
+2. 在“翻译服务”中配置在线模式（生产接线会将 selectionDemo 设为 false）。打开弹窗时不自动发送，点击“翻译所选内容”后才请求。
 3. 验证正常、空译文、响应 ID/hash 错配、断网、超时、错误后重试、关闭后迟到响应、旋转屏幕；检查未增加章节译文和任务。
 4. 同时运行章节翻译，确认临时查询结果没有混入段落缓存，临时请求的失败/取消不影响整章任务。
 

@@ -11,3 +11,5 @@ work/
 private-books/
 secrets.properties
 .env
+__pycache__/
+*.py[cod]
