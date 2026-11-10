@@ -1,5 +1,6 @@
 package com.example.bilingualreader.ui.reader;
 
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.view.*;
 import android.widget.TextView;
@@ -15,7 +16,7 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
   private boolean running;
 
   public interface OnSelectionTranslate {
-    void translate(Paragraph paragraph, int start, int end);
+    void translate(Paragraph paragraph, int start, int end, Rect screenBounds);
   }
 
   private OnSelectionTranslate selection;
@@ -86,8 +87,25 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
                 && start >= 0
                 && end > start
                 && end <= p.getOriginalText().length()
-                && p.getOriginalText().contentEquals(h.original.getText()))
-              selection.translate(p, start, end);
+                && p.getOriginalText().contentEquals(h.original.getText())) {
+              int[] position = new int[2];
+              h.original.getLocationOnScreen(position);
+              android.text.Layout layout = h.original.getLayout();
+              Rect bounds = new Rect();
+              h.original.getGlobalVisibleRect(bounds);
+              if (layout != null) {
+                int textTop =
+                    position[1] + h.original.getTotalPaddingTop() - h.original.getScrollY();
+                bounds.top =
+                    Math.max(
+                        bounds.top, textTop + layout.getLineTop(layout.getLineForOffset(start)));
+                bounds.bottom =
+                    Math.min(
+                        bounds.bottom,
+                        textTop + layout.getLineBottom(layout.getLineForOffset(end - 1)));
+              }
+              selection.translate(p, start, end, bounds);
+            }
             mode.finish();
             return true;
           }
@@ -107,14 +125,28 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
             && p.getSourceHash().equals(t.getSourceHash())
             && "en".equals(t.getSourceLanguage())
             && "zh-CN".equals(t.getTargetLanguage());
-    h.translated.setText(
-        valid && t.getStatus() == TranslationStatus.SUCCESS
-            ? t.getTranslatedText()
-            : valid && t.getStatus() == TranslationStatus.FAILED
-                ? "翻译失败 · 可重试本章"
-                : running || valid && t.getStatus() == TranslationStatus.RUNNING
-                    ? "翻译中…"
-                    : "未翻译 · 点击上方翻译本章");
+    boolean hasResult =
+        valid
+            && t.getStatus() == TranslationStatus.SUCCESS
+            && t.getTranslatedText() != null
+            && !t.getTranslatedText().trim().isEmpty();
+    boolean show =
+        hasResult
+            || running
+            || valid
+                && (t.getStatus() == TranslationStatus.RUNNING
+                    || t.getStatus() == TranslationStatus.FAILED);
+    h.translated.setVisibility(show ? View.VISIBLE : View.GONE);
+    if (!show) {
+      h.translated.setText(null);
+      return;
+    }
+    if (hasResult) h.translated.setText(t.getTranslatedText());
+    else
+      h.translated.setText(
+          valid && t.getStatus() == TranslationStatus.FAILED
+              ? R.string.reader_translation_failed
+              : R.string.reader_translation_running);
   }
 
   public int getItemCount() {

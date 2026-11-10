@@ -1,13 +1,4 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:orientation="vertical">
-        <TextView android:id="@+id/chapter_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="22sp" android:textStyle="bold"/>
-        <TextView android:id="@+id/task_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" style="@style/MutedText" android:accessibilityLiveRegion="polite"/>
-        <ProgressBar android:id="@+id/progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:max="100" android:layout_marginTop="8dp"/>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-            <com.google.android.material.button.MaterialButton android:id="@+id/translate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="翻译本章"/>
-            <com.google.android.material.button.MaterialButton android:id="@+id/cancel" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="取消任务" android:visibility="gone"/>
-        </LinearLayout>
-    </LinearLayout>
     <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"/>
     <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" style="@style/MutedText" android:visibility="gone"/>
     <com.google.android.material.button.MaterialButton android:id="@+id/retry_reading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="重新加载章节" android:visibility="gone"/>

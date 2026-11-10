@@ -1,0 +1,4 @@
+<resources>
+    <string name="selection_drag_description">翻译浮窗，拖动标题可移动</string>
+    <string name="selection_close_symbol">×</string>
+</resources>
