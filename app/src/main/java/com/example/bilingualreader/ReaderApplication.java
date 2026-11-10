@@ -12,6 +12,7 @@ public final class ReaderApplication extends Application {
     super.onCreate();
     container = AppGraphFactory.create(this);
     container.io.execute(() -> {
+      if (!(container.translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator)) return;
       try {
         ((com.example.bilingualreader.translation.WorkTranslationCoordinator) container.translation)
             .recoverUnfinishedTasks();

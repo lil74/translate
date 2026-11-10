@@ -18,6 +18,7 @@ public final class TranslationWorker extends Worker {
     synchronized (EXECUTION_LOCK) {
       if (isStopped()) return Result.retry();
       AppContainer graph = ((ReaderApplication) getApplicationContext()).getContainer();
+      if (graph.translationStore == null) return Result.failure();
       String id = getInputData().getString("taskId");
       if (id == null) return Result.failure();
       try {
@@ -47,7 +48,7 @@ public final class TranslationWorker extends Worker {
     if (current instanceof LibreTranslateService) ((LibreTranslateService) current).cancel();
     AppContainer graph = ((ReaderApplication) getApplicationContext()).getContainer();
     String id = getInputData().getString("taskId");
-    if (graph != null && id != null) graph.io.execute(() -> {
+    if (graph != null && graph.translationStore != null && id != null) graph.io.execute(() -> {
       try { graph.translationStore.markTaskWaiting(id, ErrorCode.NETWORK_ERROR.name(),
           "任务暂停，等待网络或系统恢复，已完成译文已保存"); }
       catch (AppException ignored) { /* Cancellation/deletion may already have removed the task. */ }

@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-10",
+  "timezone": "Asia/Shanghai",
+  "branch": "C1",
+  "uncommittedWorkingChangesIncluded": true,
+  "device": { "model": "24115RA8EC", "android": "16", "api": 36 },
+  "suites": [
+    { "name": "TranslationPersistenceTest", "tests": 9, "failures": 0, "seconds": 0.904 },
+    { "name": "SelectionTranslationDeviceTest", "tests": 5, "failures": 0, "seconds": 87.189 }
+  ],
+  "total": 14,
+  "failures": 0,
+  "debugApkGenerated": true,
+  "debugApkInstalledWithDataPreserved": true,
+  "testApkGeneratedAndInstalled": true,
+  "releaseApkGenerated": false,
+  "appApkSha256": "55B903FD6BA95F6B298DC898C3FC8904B3003688864FF6B399588848B440E1D5",
+  "testApkSha256": "88BE62CCE3CF7417610F761F973C6C5298704EEB02C6C851B7D79D02E6071179",
+  "foregroundLaunchAssistanceRequired": true,
+  "realOnlineServiceTested": false,
+  "nativeLongPressAndHandleDragTested": false,
+  "productionCodeChangesThisTestRun": false,
+  "committed": false,
+  "pushed": false
+}

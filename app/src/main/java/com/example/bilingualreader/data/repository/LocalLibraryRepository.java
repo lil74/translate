@@ -13,6 +13,7 @@ import com.example.bilingualreader.contract.translation.*;
 import com.example.bilingualreader.data.db.LibraryDatabase;
 import com.example.bilingualreader.data.db.LibraryDatabase.*;
 import com.example.bilingualreader.epub.EpubParser;
+import com.example.bilingualreader.translation.TranslationCachePolicy;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
@@ -91,10 +92,11 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
       throw new AppException(ErrorCode.DATABASE_ERROR, "翻译数据保存失败", false, error);
     } finally { db.endTransaction(); }
   }
-  private boolean success(ParagraphRow p, String lang, String src) {
+  private boolean success(ParagraphRow p, String lang, String src, String mode) {
     TranslationRow t = dao.translation(p.paragraphId, lang);
     return t != null && "SUCCESS".equals(t.status) && src.equals(t.sourceLanguage)
-        && p.sourceHash.equals(t.sourceHash) && t.translatedText != null && !t.translatedText.trim().isEmpty();
+        && p.sourceHash.equals(t.sourceHash) && t.translatedText != null && !t.translatedText.trim().isEmpty()
+        && TranslationCachePolicy.canReuse(mode, t.provider, t.translatedText);
   }
   private static TranslationTask task(TaskRow t) {
     return t == null ? null : new TranslationTask(t.taskId, t.chapterId, t.sourceLanguage,
@@ -113,7 +115,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
     int ok = 0, failed = 0;
     List<ParagraphRow> paragraphs = dao.paragraphs(t.chapterId);
     for (ParagraphRow p : paragraphs) {
-      if (success(p, t.targetLanguage, t.sourceLanguage)) ok++;
+      if (success(p, t.targetLanguage, t.sourceLanguage, t.executionMode)) ok++;
       else {
         TranslationRow r = dao.translation(p.paragraphId, t.targetLanguage);
         if (r != null && p.sourceHash.equals(r.sourceHash) && "FAILED".equals(r.status)) failed++;
@@ -138,18 +140,28 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
   }
   @Override public TranslationTask prepareTask(String chapterId, String source, String target)
       throws AppException {
+    return prepare(chapterId, source, target, "", "");
+  }
+  private TranslationTask prepare(String chapterId, String source, String target,
+      String mode, String endpoint) throws AppException {
     if (!"en".equals(source) || !"zh-CN".equals(target))
       throw err(ErrorCode.UNSUPPORTED_LANGUAGE, "仅支持英语翻译为简体中文");
     return transaction(() -> {
       if (dao.chapter(chapterId) == null) throw err(ErrorCode.CHAPTER_NOT_FOUND, "章节不存在");
       TaskRow existing = dao.activeTask(chapterId, source, target);
-      if (existing != null) return task(existing);
+      if (existing != null) {
+        if (mode.isEmpty() || (mode.equals(existing.executionMode) && endpoint.equals(existing.endpoint)))
+          return task(existing);
+        // Supersede the old service snapshot before it can write late results.
+        cancelTask(existing.taskId);
+      }
       TaskRow t = new TaskRow(); t.taskId = UUID.randomUUID().toString(); t.chapterId = chapterId;
       t.sourceLanguage = source; t.targetLanguage = target; t.state = "QUEUED";
+      t.executionMode = mode; t.endpoint = endpoint;
       t.createdAt = t.updatedAt = System.currentTimeMillis();
       List<ParagraphRow> paragraphs = dao.paragraphs(chapterId); t.totalCount = paragraphs.size();
       for (ParagraphRow p : paragraphs) {
-        if (success(p, target, source)) t.successCount++;
+        if (success(p, target, source, mode)) t.successCount++;
         else dao.putTranslation(row(p, t, "PENDING"));
       }
       if (t.successCount == t.totalCount) t.state = "COMPLETED";
@@ -161,11 +173,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
   }
   @Override public TranslationTask prepareConfiguredTask(String chapterId, String source, String target,
       String mode, String endpoint) throws AppException {
-    return transaction(() -> {
-      TranslationTask prepared = prepareTask(chapterId, source, target);
-      bindService(prepared.getTaskId(), mode, endpoint);
-      return prepared;
-    });
+    return prepare(chapterId, source, target, mode, endpoint);
   }
   @Override public List<Paragraph> getRunnableParagraphs(String id) throws AppException {
     return pending(id, true);
@@ -176,7 +184,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
       if (!active(t)) return out;
       for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
         TranslationRow r = dao.translation(p.paragraphId, t.targetLanguage);
-        if (!success(p, t.targetLanguage, t.sourceLanguage)
+        if (!success(p, t.targetLanguage, t.sourceLanguage, t.executionMode)
             && !(skipFailed && r != null && "FAILED".equals(r.status))) {
           out.add(new Paragraph(p.paragraphId, p.chapterId, p.orderIndex,
               BlockType.valueOf(p.blockType), p.originalText, p.sourceHash));
@@ -195,7 +203,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
     transaction(() -> { TaskRow t = dao.task(id); if (!active(t)) return null;
       Set<String> selected = new HashSet<>(ids);
       for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
-        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage))
+        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage, t.executionMode))
           dao.putTranslation(row(p, t, "RUNNING"));
       } return null;
     });
@@ -215,14 +223,16 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
         if (p == null || !seen.add(o.getParagraphId()) || !p.sourceHash.equals(o.getSourceHash())
             || (o.getStatus() != TranslationStatus.SUCCESS && o.getStatus() != TranslationStatus.FAILED)
             || (o.getStatus() == TranslationStatus.SUCCESS
-                && (o.getTranslatedText() == null || o.getTranslatedText().trim().isEmpty())))
+                && (o.getTranslatedText() == null || o.getTranslatedText().trim().isEmpty()
+                    || !TranslationCachePolicy.canReuse(t.executionMode, o.getProvider(), o.getTranslatedText()))))
           throw err(ErrorCode.INVALID_RESPONSE, "翻译结果与原文不匹配");
       }
       for (TranslationOutput o : result.getItems()) {
         ParagraphRow p = allowed.get(o.getParagraphId());
-        if (success(p, t.targetLanguage, t.sourceLanguage)) continue;
+        if (success(p, t.targetLanguage, t.sourceLanguage, t.executionMode)) continue;
         TranslationRow r = row(p, t, o.getStatus().name()); r.translatedText = o.getTranslatedText();
         r.provider = o.getProvider(); r.engineVersion = o.getEngineVersion(); r.errorCode = o.getErrorCode();
+        if ("mock".equals(t.executionMode)) r.provider = "fake";
         dao.putTranslation(r);
       }
       recount(t); return null;
@@ -234,7 +244,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
       TaskRow t = dao.task(id); if (!active(t)) return null;
       Set<String> selected = new HashSet<>(ids);
       for (ParagraphRow p : dao.paragraphs(t.chapterId)) {
-        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage)) {
+        if (selected.contains(p.paragraphId) && !success(p, t.targetLanguage, t.sourceLanguage, t.executionMode)) {
           TranslationRow r = row(p, t, "FAILED"); r.errorCode = code; dao.putTranslation(r);
         }
       }

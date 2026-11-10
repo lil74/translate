@@ -8,11 +8,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0'
-<<<<<<< Updated upstream
-        testInstrumentationRunner 'com.example.bilingualreader.AIntegrationRunner'
-=======
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
->>>>>>> Stashed changes
+        testInstrumentationRunner providers.gradleProperty('androidTestRunner').getOrElse('androidx.test.runner.AndroidJUnitRunner')
     }
     buildTypes {
         debug { applicationIdSuffix '.debug'; versionNameSuffix '-demo' }

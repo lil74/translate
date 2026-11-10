@@ -32,15 +32,11 @@ public final class BookshelfFragment extends BaseFragment {
     vm = models().get(BookshelfViewModel.class);
     commands(vm);
     ((TextView) view.findViewById(R.id.mode_banner))
-<<<<<<< Updated upstream
-        .setText(
-            graph().demo ? "本地书库 · 导入 EPUB 开始阅读\n当前使用模拟翻译，不会发送原文到网络。" : "本地书库 · 书籍与阅读位置保存在此设备");
-=======
         .setText("导入 EPUB 开始阅读 · 翻译本章可生成逐段译文\n"
-            + (com.example.bilingualreader.translation.TranslationConfigStore.MOCK.equals(graph().translationConfig.mode())
+            + (graph().demo || graph().translationConfig != null
+                && com.example.bilingualreader.translation.TranslationConfigStore.MOCK.equals(graph().translationConfig.mode())
                 ? "当前为模拟验证，译文有明确标记；可在右上角配置在线服务。"
                 : "在线翻译服务可在右上角菜单中配置。"));
->>>>>>> Stashed changes
     EntryAdapter<Book> adapter =
         new EntryAdapter<>(
             new EntryAdapter.Presenter<Book>() {

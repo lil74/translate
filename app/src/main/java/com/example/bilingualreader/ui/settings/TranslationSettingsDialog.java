@@ -14,7 +14,7 @@ public final class TranslationSettingsDialog {
     int padding = (int) (24 * context.getResources().getDisplayMetrics().density);
     fields.setPadding(padding, padding / 2, padding, 0);
     TextView explanation = new TextView(context);
-    explanation.setText("在线服务使用团队自建 LibreTranslate 的完整 /translate 地址，不在手机内保存供应商密钥。切换服务会保留已有成功译文。");
+    explanation.setText("在线服务填写兼容 LibreTranslate 的完整 /translate 地址。关闭模拟后，点击“翻译本章”会重新翻译模拟结果，并保留已有真实译文。正在运行的旧服务任务会在再次点击翻译时被替换。");
     fields.addView(explanation);
     Switch mock = new Switch(context);
     mock.setText("模拟验证（不会产生真实译文）");

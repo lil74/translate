@@ -87,31 +87,29 @@ public final class MainActivity extends AppCompatActivity {
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
     menu.add(0, 1, 0, "阅读设置").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-<<<<<<< Updated upstream
-    if (((ReaderApplication) getApplication()).getContainer().translation
-        instanceof com.example.bilingualreader.di.TranslationDiagnostics)
-      menu.add(0, 2, 1, "模拟翻译失败（联调）");
-=======
-    menu.add(0, 2, 1, "翻译服务").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
->>>>>>> Stashed changes
+    com.example.bilingualreader.di.AppContainer graph = ((ReaderApplication) getApplication()).getContainer();
+    if (graph.translationConfig != null)
+      menu.add(0, 2, 1, "翻译服务").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+    if (graph.translation instanceof com.example.bilingualreader.di.TranslationDiagnostics)
+      menu.add(0, 3, 2, "模拟翻译失败（联调）");
     return true;
   }
 
   @Override
   public boolean onOptionsItemSelected(MenuItem item) {
-    if (item.getItemId() == 2) {
-<<<<<<< Updated upstream
+    if (item.getItemId() == 3) {
       com.example.bilingualreader.contract.translation.TranslationCoordinator translator =
           ((ReaderApplication) getApplication()).getContainer().translation;
       if (translator instanceof com.example.bilingualreader.di.TranslationDiagnostics) {
         ((com.example.bilingualreader.di.TranslationDiagnostics) translator).failNextRequest();
-        android.widget.Toast.makeText(this, "下一次未完成段落将模拟失败，可验证重试", android.widget.Toast.LENGTH_LONG)
-            .show();
+        android.widget.Toast.makeText(this, "下一次未完成段落将模拟失败，可验证重试", android.widget.Toast.LENGTH_LONG).show();
       }
-=======
+      return true;
+    }
+    if (item.getItemId() == 2) {
+      if (((ReaderApplication) getApplication()).getContainer().translationConfig == null) return true;
       com.example.bilingualreader.ui.settings.TranslationSettingsDialog.show(this,
           ((ReaderApplication) getApplication()).getContainer().translationConfig);
->>>>>>> Stashed changes
       return true;
     }
     if (item.getItemId() == 1) {

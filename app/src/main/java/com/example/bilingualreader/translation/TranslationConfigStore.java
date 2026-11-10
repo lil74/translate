@@ -9,10 +9,17 @@ public final class TranslationConfigStore {
   public static final String MOCK = "mock", ONLINE = "online";
   private final SharedPreferences prefs;
   private final boolean debug;
+  private volatile Runnable onChanged;
+  private final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
+    Runnable callback = onChanged;
+    if (callback != null && ("mode".equals(key) || "endpoint".equals(key))) callback.run();
+  };
   public TranslationConfigStore(Context context, boolean debug) {
     prefs = context.getSharedPreferences("translation_settings", Context.MODE_PRIVATE);
     this.debug = debug;
+    prefs.registerOnSharedPreferenceChangeListener(listener);
   }
+  public void setOnChanged(Runnable callback) { onChanged = callback; }
   public boolean allowsMock() { return debug; }
   public String mode() { return prefs.getString("mode", debug ? MOCK : ONLINE); }
   public String endpoint() { return prefs.getString("endpoint", ""); }

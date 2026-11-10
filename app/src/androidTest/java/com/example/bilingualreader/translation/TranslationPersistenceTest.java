@@ -71,6 +71,58 @@ public class TranslationPersistenceTest {
     TranslationTask cached=prepare();
     assertEquals(TaskState.COMPLETED,cached.getState());assertTrue(store.getPendingParagraphs(cached.getTaskId()).isEmpty());
   }
+  @Test public void switchingOnlineReplacesMockCacheAndPersistsGenuineResults() throws Exception {
+    TranslationTask mock=prepare();
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(mock.getTaskId());
+    assertEquals("fake",db.dao().translation("p0","zh-CN").provider);
+    TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    assertEquals(TaskState.QUEUED,online.getState());assertEquals(0,online.getSuccessCount());
+    assertEquals(3,store.getPendingParagraphs(online.getTaskId()).size());
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(online.getTaskId());
+    LocalLibraryRepository reopened=new LocalLibraryRepository(context,db);
+    TranslationTask cached=reopened.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    assertEquals(TaskState.COMPLETED,cached.getState());assertEquals(3,cached.getSuccessCount());
+    assertEquals("test",db.dao().translation("p0","zh-CN").provider);
+    assertEquals("online",reopened.getService(cached.getTaskId())[0]);
+  }
+  @Test public void switchingToMockPreservesGenuineCachedTranslations() throws Exception {
+    TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(online.getTaskId());
+    TranslationTask mock=prepare();
+    assertEquals(TaskState.COMPLETED,mock.getState());
+    assertEquals("test",db.dao().translation("p0","zh-CN").provider);
+    assertTrue(store.getPendingParagraphs(mock.getTaskId()).isEmpty());
+  }
+  @Test public void serviceChangeCancelsOldTaskAndRejectsItsLateResponse() throws Exception {
+    TranslationTask mock=prepare();
+    TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://one.example/translate");
+    assertNotEquals(mock.getTaskId(),online.getTaskId());
+    assertEquals(TaskState.CANCELLED,store.getTask(mock.getTaskId()).getState());
+    store.applyBatchResult(mock.getTaskId(),one(mock.getTaskId(),db.dao().paragraphs("test-chapter").get(0)));
+    assertEquals("PENDING",db.dao().translation("p0","zh-CN").status);
+    TranslationTask changed=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://two.example/translate");
+    assertEquals(TaskState.CANCELLED,store.getTask(online.getTaskId()).getState());
+    assertEquals("https://two.example/translate",store.getService(changed.getTaskId())[1]);
+    assertEquals(1,store.getActiveTasks().size());
+  }
+  @Test public void onlineKeepsRealCacheButInvalidatesLegacyMockAndUnknownCache() throws Exception {
+    TranslationTask legacy=store.prepareTask("test-chapter","en","zh-CN");
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(legacy.getTaskId());
+    TranslationRow fake=db.dao().translation("p0","zh-CN");fake.provider="fake";db.dao().putTranslation(fake);
+    TranslationRow unknown=db.dao().translation("p1","zh-CN");unknown.provider=null;db.dao().putTranslation(unknown);
+    TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    assertEquals(1,online.getSuccessCount());assertEquals(2,store.getPendingParagraphs(online.getTaskId()).size());
+    assertEquals("test",db.dao().translation("p2","zh-CN").provider);
+  }
+  @Test public void onlineRejectsMockResultInsteadOfSavingItAsGenuine() throws Exception {
+    TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    ParagraphRow p=db.dao().paragraphs("test-chapter").get(0);
+    TranslationBatchResult fake=new TranslationBatchResult(online.getTaskId(),"request",Collections.singletonList(
+        new TranslationOutput(p.paragraphId,p.sourceHash,TranslationStatus.SUCCESS,"模拟内容","fake","1",null)));
+    try {store.applyBatchResult(online.getTaskId(),fake);fail("Must reject mock provenance");}
+    catch(AppException expected){assertEquals(ErrorCode.INVALID_RESPONSE,expected.getCode());}
+    assertEquals("PENDING",db.dao().translation("p0","zh-CN").status);
+  }
   @Test public void duplicateClicksHaveOneActiveTaskAcrossRepositoryInstances() throws Exception {
     LocalLibraryRepository second=new LocalLibraryRepository(context,db);
     ExecutorService pool=Executors.newFixedThreadPool(2);CountDownLatch gate=new CountDownLatch(1);

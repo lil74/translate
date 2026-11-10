@@ -1,12 +1,12 @@
 # 接口对接说明 · M0
 
-<<<<<<< Updated upstream
+> 2026-11-09 统一：保留原五参数与 A 的七参数 AppContainer，同时使用九参数入口接入选词服务和 C 的运行时依赖。选词服务和模拟标志通过 selectionBinding() 一起快照，保留到弹窗 ViewModel；不新增 HTTP / 业务共享模型 / 表。当前说明见 [C_SELECTION_UNIFICATION.md](C_SELECTION_UNIFICATION.md)，下文早期接线记录保留其日期。
+
 选词/选句翻译补充：已有 TranslationService、请求和响应类型均不变。AppContainer 新增 selectionTranslation 与 selectionDemo，提供七参数构造方法，原五参数构造方法保留。临时查询不经过章节 Coordinator/TranslationStore。C 的详细接线说明见 C_SELECTION_TRANSLATION.md。
 
 2026-11-08 补充：共享签名与字段未变。当前两个 Factory 已接真实 LocalLibraryRepository；Debug 用 StoreDemoCoordinator + FakeTranslationService + TranslationStore 验证 A 界面，Release 使用 UnavailableTranslationCoordinator 等待 C 正式调度。具体替换方法见 A_COMPLETE.md。下文保留最初契约说明。
-=======
+
 > 2026-11-07 补充：原 Book / Reader / TranslationStore / Coordinator / Service 的方法和业务字段未改变。新增 `TranslationRuntimeStore extends TranslationStore`，用于服务快照、活跃任务、可运行段落及持久化尝试计数；仍由 LocalLibraryRepository 唯一写库。任务与配置用 prepareConfiguredTask 原子创建，数据库升级为版本 2，见 C_IMPLEMENTATION.md。AppException 移除 final，允许 RetryAfterException 携带服务端等待时间，原构造和 getter 不变。
->>>>>>> Stashed changes
 
 本次没有修改 v1.0 业务字段、方法签名或状态枚举。原说明完整保存在 `PROJECT_SPEC.md`；此文件只说明源码落点和调用方式。
 

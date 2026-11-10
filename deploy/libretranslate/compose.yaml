@@ -1,0 +1,16 @@
+# Local development endpoint. Start Docker Desktop (Linux containers) first.
+# First startup downloads real language models and may take several minutes.
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      LT_HOST: "0.0.0.0"
+      LT_LOAD_ONLY: "en,zh"
+      LT_CHAR_LIMIT: "4000"
+    volumes:
+      - models:/home/libretranslate/.local
+    restart: unless-stopped
+volumes:
+  models:

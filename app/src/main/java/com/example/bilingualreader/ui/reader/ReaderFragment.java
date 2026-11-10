@@ -131,23 +131,14 @@ public final class ReaderFragment extends BaseFragment {
     renderTask(view, null);
     vm.task.observe(getViewLifecycleOwner(), t -> renderTask(view, t));
     view.findViewById(R.id.retry_reading).setOnClickListener(v -> vm.retryOpen());
-<<<<<<< Updated upstream
-    view.findViewById(R.id.translate)
-        .setOnClickListener(
-            v -> {
-              if (graph().demo) vm.translate();
-              else
-                new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("翻译当前章节")
-                    .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
-                    .setNegativeButton("暂不翻译", null)
-                    .setPositiveButton("继续", (dialog, which) -> vm.translate())
-                    .show();
-            });
-=======
     view.findViewById(R.id.translate).setOnClickListener(v -> {
       com.example.bilingualreader.translation.TranslationConfigStore config = graph().translationConfig;
-      if (config.needsConsent()) {
+      if (config == null && !graph().demo) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("翻译当前章节").setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
+            .setNegativeButton("暂不翻译", null)
+            .setPositiveButton("继续", (dialog, which) -> vm.translate()).show();
+      } else if (config != null && config.needsConsent()) {
         String endpoint = config.endpoint();
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
             .setTitle("发送本章原文用于翻译？")
@@ -158,7 +149,6 @@ public final class ReaderFragment extends BaseFragment {
             }).show();
       } else vm.translate();
     });
->>>>>>> Stashed changes
     view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
     view.findViewById(R.id.previous)
         .setOnClickListener(
@@ -204,7 +194,7 @@ public final class ReaderFragment extends BaseFragment {
           break;
         case COMPLETED:
           label = "本章翻译完成";
-          button = "使用已有译文";
+          button = "翻译本章";
           break;
         case CANCELLED:
           label = "已取消 · 已完成译文已保留";
@@ -218,8 +208,9 @@ public final class ReaderFragment extends BaseFragment {
       }
       label += " · " + t.getSuccessCount() + " / " + t.getTotalCount();
     }
-    if (graph().demo || com.example.bilingualreader.translation.TranslationConfigStore.MOCK
-        .equals(graph().translationConfig.mode())) label = "模拟验证 · " + label;
+    if (graph().demo || graph().translationConfig != null
+        && com.example.bilingualreader.translation.TranslationConfigStore.MOCK
+            .equals(graph().translationConfig.mode())) label = "模拟验证 · " + label;
     ((TextView) view.findViewById(R.id.task_status)).setText(label);
     ProgressBar bar = view.findViewById(R.id.progress);
     bar.setProgress(
