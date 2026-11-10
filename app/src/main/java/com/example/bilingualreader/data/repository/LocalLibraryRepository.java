@@ -22,22 +22,16 @@ import java.util.*;
 
 /** Blocking commands are called from the ViewModel executor or Worker. */
 public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationRuntimeStore {
+  private static final Object IMPORT_LOCK=new Object();
   private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
   public LocalLibraryRepository(Context context) {
     this.context=context.getApplicationContext();
     db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db")
         .addMigrations(LibraryDatabase.MIGRATION_1_2).build();dao=db.dao();
+    new Thread(this::cleanupOrphans,"epub-cleanup").start();
   }
   public LocalLibraryRepository(Context context, LibraryDatabase database) {
     this.context=context.getApplicationContext(); this.db=database; this.dao=db.dao();
-public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationStore {
-  private static final Object IMPORT_LOCK=new Object();
-  private static final Object TASK_LOCK=new Object();
-  private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
-  public LocalLibraryRepository(Context context) {
-    this.context=context.getApplicationContext();
-    db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db").build();dao=db.dao();
-    new Thread(this::cleanupOrphans,"epub-cleanup").start();
   }
   private void cleanupOrphans(){
     try{

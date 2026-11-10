@@ -1,0 +1,7 @@
+<resources>
+<item type="id" name="reader_translation"/><item type="id" name="chapter_title"/><item type="id" name="task_status"/><item type="id" name="translate"/><item type="id" name="cancel"/>
+<string name="reader_loading_title">阅读中…</string>
+<string name="reader_translate_action">翻译本章</string>
+<string name="reader_translation_running">翻译中…</string>
+<string name="reader_translation_failed">翻译失败 · 点击顶部翻译图标重试</string>
+</resources>

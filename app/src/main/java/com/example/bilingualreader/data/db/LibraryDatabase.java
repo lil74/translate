@@ -61,7 +61,6 @@ public abstract class LibraryDatabase extends RoomDatabase {
   @androidx.room.Dao public interface DaoAccess {
     @Query("SELECT * FROM books ORDER BY COALESCE(lastReadAt,0) DESC, importedAt DESC, bookId ASC") LiveData<List<BookRow>> observeBooks();
     @Query("SELECT * FROM books WHERE bookId=:id") BookRow book(String id);
-    @Query("SELECT * FROM chapters WHERE chapterId=:id") ChapterRow chapter(String id);
     @Query("SELECT localFilePath FROM books") List<String> bookPaths();
     @Query("SELECT coverPath FROM books WHERE coverPath IS NOT NULL") List<String> coverPaths();
     @Insert void insertBook(BookRow row);
