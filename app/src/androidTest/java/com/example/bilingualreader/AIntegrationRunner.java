@@ -68,6 +68,28 @@ public final class AIntegrationRunner extends Instrumentation {
     AtomicReference<String> s = new AtomicReference<>("");
     main(
         () -> {
+          if (id == R.id.chapter_title) {
+            s.set(
+                ((com.google.android.material.appbar.MaterialToolbar)
+                        activity.findViewById(R.id.toolbar))
+                    .getTitle()
+                    .toString());
+            return;
+          }
+          androidx.fragment.app.Fragment f =
+              activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+          if (f instanceof com.example.bilingualreader.ui.reader.ReaderFragment) {
+            com.example.bilingualreader.ui.reader.ReaderFragment reader =
+                (com.example.bilingualreader.ui.reader.ReaderFragment) f;
+            if (id == R.id.task_status) {
+              s.set(reader.getTranslationStatus());
+              return;
+            }
+            if (id == R.id.translate) {
+              s.set(reader.getTranslationAction());
+              return;
+            }
+          }
           TextView v = activity.findViewById(id);
           if (v != null) s.set(v.getText().toString());
         });
@@ -77,6 +99,18 @@ public final class AIntegrationRunner extends Instrumentation {
   private void tap(int id) {
     main(
         () -> {
+          if (id == R.id.translate || id == R.id.cancel) {
+            com.example.bilingualreader.ui.reader.ReaderFragment reader =
+                (com.example.bilingualreader.ui.reader.ReaderFragment)
+                    activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            PopupMenu popup = reader.showTranslationActions();
+            MenuItem action = popup.getMenu().findItem(id);
+            if (action == null || !action.isEnabled())
+              throw new AssertionError("Translation action unavailable");
+            popup.getMenu().performIdentifierAction(id, 0);
+            popup.dismiss();
+            return;
+          }
           View v = activity.findViewById(id);
           if (v == null || !v.isEnabled()) throw new AssertionError("Button unavailable: " + id);
           v.performClick();
@@ -141,7 +175,7 @@ public final class AIntegrationRunner extends Instrumentation {
           throw new AssertionError("Import deduplication failed");
         // Reset only this test fixture so reruns can exercise failure/retry without old caches.
         graph.books.deleteBook(book.getBookId());
-        book=graph.books.importBook(Uri.fromFile(sample)).getBook();
+        book = graph.books.importBook(Uri.fromFile(sample)).getBook();
         ok("Real EPUB import, duplicate import, and Room-backed bookshelf");
       }
       List<Chapter> chapters = graph.books.getChapters(book.getBookId());
@@ -183,15 +217,13 @@ public final class AIntegrationRunner extends Instrumentation {
       if (resumeOnly) {
         tap(R.id.continue_reading);
         waitFor(
-            () -> text(R.id.chapter_title).equals(chapters.get(1).getTitle()),
+            () -> text(R.id.chapter_title).equals("Beyond the window"),
             "Continue did not restore chapter");
         ok("Continue opens saved chapter after process restart");
       } else {
         // Select the first actual TOC entry through its displayed row.
         main(() -> ((RecyclerView) activity.findViewById(R.id.list)).getChildAt(0).performClick());
-        waitFor(
-            () -> text(R.id.chapter_title).equals(chapters.get(0).getTitle()),
-            "Reader did not open");
+        waitFor(() -> text(R.id.chapter_title).equals("A small beginning"), "Reader did not open");
         waitFor(
             () -> {
               AtomicBoolean ready = new AtomicBoolean();
@@ -203,18 +235,45 @@ public final class AIntegrationRunner extends Instrumentation {
               return ready.get();
             },
             "Paragraphs missing");
+        main(
+            () -> {
+              com.google.android.material.appbar.MaterialToolbar toolbar =
+                  activity.findViewById(R.id.toolbar);
+              if (toolbar.getMenu().findItem(R.id.reader_translation) == null)
+                throw new AssertionError("Toolbar translation icon missing");
+              if (activity.findViewById(R.id.task_status) != null
+                  || activity.findViewById(R.id.translate) != null)
+                throw new AssertionError("Old fixed translation header still present");
+              RecyclerView list = activity.findViewById(R.id.list);
+              for (int i = 0; i < list.getChildCount(); i++)
+                if (list.getChildAt(i).findViewById(R.id.translated).getVisibility() != View.GONE)
+                  throw new AssertionError("Untranslated paragraph shows an empty box");
+            });
+        ok("Compact toolbar, chapter number, and no empty translation boxes");
         screenshot("03-reader");
         exerciseSelection();
-        AtomicReference<List<ParagraphItem>> untouched=watch(graph.reader.observeParagraphs(chapters.get(0).getChapterId(),"zh-CN"));
-        waitFor(()->untouched.get()!=null,"Could not inspect chapter after selection lookup");
-        if(untouched.get().stream().anyMatch(p->p.getTranslation()!=null))throw new AssertionError("Temporary lookup wrote chapter translations");
+        AtomicReference<List<ParagraphItem>> untouched =
+            watch(graph.reader.observeParagraphs(chapters.get(0).getChapterId(), "zh-CN"));
+        waitFor(() -> untouched.get() != null, "Could not inspect chapter after selection lookup");
+        if (untouched.get().stream().anyMatch(p -> p.getTranslation() != null))
+          throw new AssertionError("Temporary lookup wrote chapter translations");
         ok("Temporary selection lookups do not write chapter translations");
         ok("Real original paragraphs are displayed in chapter order");
         ((TranslationDiagnostics) graph.translation).failNextRequest();
         tap(R.id.translate);
         waitFor(() -> text(R.id.task_status).contains("模拟连接失败"), "Failure state not shown");
         if (!text(R.id.translate).contains("重试")) throw new AssertionError("Retry entry missing");
+        AtomicReference<PopupMenu> retryMenu = new AtomicReference<>();
+        main(
+            () ->
+                retryMenu.set(
+                    ((com.example.bilingualreader.ui.reader.ReaderFragment)
+                            activity
+                                .getSupportFragmentManager()
+                                .findFragmentById(R.id.fragment_container))
+                        .showTranslationActions()));
         screenshot("04-retry");
+        main(() -> retryMenu.get().dismiss());
         ok("Failed task shows reason and a retry entry");
         tap(R.id.translate);
         waitFor(() -> text(R.id.task_status).contains("本章翻译完成"), "Retry did not complete");
@@ -233,12 +292,20 @@ public final class AIntegrationRunner extends Instrumentation {
           if (!row.getParagraph().getParagraphId().equals(row.getTranslation().getParagraphId())
               || !row.getTranslation().getTranslatedText().contains("模拟译文"))
             throw new AssertionError("Translation ID or labelling mismatch");
+        main(
+            () -> {
+              RecyclerView list = activity.findViewById(R.id.list);
+              boolean shown = false;
+              for (int i = 0; i < list.getChildCount(); i++)
+                shown |=
+                    list.getChildAt(i).findViewById(R.id.translated).getVisibility()
+                        == View.VISIBLE;
+              if (!shown) throw new AssertionError("Successful translations not visible");
+            });
         screenshot("05-bilingual");
         ok("Retry uses the same paragraph IDs and persisted labelled fake results");
         tap(R.id.next);
-        waitFor(
-            () -> text(R.id.chapter_title).equals(chapters.get(1).getTitle()),
-            "Next chapter missing");
+        waitFor(() -> text(R.id.chapter_title).equals("Beyond the window"), "Next chapter missing");
         waitFor(() -> text(R.id.task_status).contains("未翻译"), "Old task leaked to new chapter");
         tap(R.id.translate);
         waitFor(() -> text(R.id.task_status).contains("正在翻译"), "Task did not run");
@@ -318,7 +385,7 @@ public final class AIntegrationRunner extends Instrumentation {
   private void exerciseSelection() throws Exception {
     for (String selected : new String[] {"small", "A small beginning"}) {
       AtomicReference<ActionMode> mode = new AtomicReference<>();
-      int[] touch=new int[2];
+      int[] touch = new int[2];
       main(
           () -> {
             TextView original = activity.findViewById(R.id.original);
@@ -343,15 +410,19 @@ public final class AIntegrationRunner extends Instrumentation {
                   }
                 });
             original.getLocationOnScreen(touch);
-            android.text.Layout layout=original.getLayout();
-            int offset=Math.max(0,original.getText().toString().indexOf("small"));
-            int line=layout.getLineForOffset(offset);
-            touch[0]+=original.getTotalPaddingLeft()+Math.round(layout.getPrimaryHorizontal(offset+1));
-            touch[1]+=original.getTotalPaddingTop()+(layout.getLineTop(line)+layout.getLineBottom(line))/2;
+            android.text.Layout layout = original.getLayout();
+            int offset = Math.max(0, original.getText().toString().indexOf("small"));
+            int line = layout.getLineForOffset(offset);
+            touch[0] +=
+                original.getTotalPaddingLeft()
+                    + Math.round(layout.getPrimaryHorizontal(offset + 1));
+            touch[1] +=
+                original.getTotalPaddingTop()
+                    + (layout.getLineTop(line) + layout.getLineBottom(line)) / 2;
           });
       // Editor starts text selection from touch coordinates, not View.performLongClick().
-      shell("input tap "+touch[0]+" "+touch[1]);
-      shell("input swipe "+touch[0]+" "+touch[1]+" "+touch[0]+" "+touch[1]+" 1000");
+      shell("input tap " + touch[0] + " " + touch[1]);
+      shell("input swipe " + touch[0] + " " + touch[1] + " " + touch[0] + " " + touch[1] + " 1000");
       waitFor(() -> mode.get() != null, "Native text selection action mode did not open");
       main(
           () -> {
@@ -401,6 +472,25 @@ public final class AIntegrationRunner extends Instrumentation {
             if (!selected.contentEquals(
                 ((TextView) sheet.get().findViewById(R.id.selection_source)).getText()))
               throw new AssertionError("Selected text mismatch");
+            androidx.fragment.app.Fragment reader =
+                activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            com.example.bilingualreader.ui.reader.SelectionTranslationSheet popup =
+                (com.example.bilingualreader.ui.reader.SelectionTranslationSheet)
+                    reader
+                        .getChildFragmentManager()
+                        .findFragmentByTag(
+                            com.example.bilingualreader.ui.reader.SelectionTranslationSheet.TAG);
+            Window window = popup.requireDialog().getWindow();
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            if ((attrs.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0
+                || attrs.dimAmount != 0f)
+              throw new AssertionError("Selection popup darkens the reader");
+            if ((attrs.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL) == 0)
+              throw new AssertionError("Selection popup blocks outside reading touches");
+            if (attrs.height != WindowManager.LayoutParams.WRAP_CONTENT)
+              throw new AssertionError("Popup still reserves a fixed screen height");
+            if ((attrs.gravity & Gravity.VERTICAL_GRAVITY_MASK) != Gravity.TOP)
+              throw new AssertionError("Popup is not floating near the top");
           });
       screenshot(selected.contains(" ") ? "08-selection-sentence" : "07-selection-word");
       main(() -> sheet.get().findViewById(R.id.selection_close).performClick());
@@ -425,7 +515,7 @@ public final class AIntegrationRunner extends Instrumentation {
           },
           "Bottom sheet did not close");
     }
-    ok("Native same-paragraph word and sentence selection opens matching bottom-sheet results");
+    ok("Native word and sentence selections open compact non-dimming floating results");
     AtomicInteger attempts = new AtomicInteger();
     com.example.bilingualreader.viewmodel.SelectionTranslationViewModel retry =
         new com.example.bilingualreader.viewmodel.SelectionTranslationViewModel(
@@ -473,10 +563,11 @@ public final class AIntegrationRunner extends Instrumentation {
     ok("Late cancelled selection response cannot overwrite a newer query");
   }
 
-  private void shell(String command)throws Exception {
-    android.os.ParcelFileDescriptor fd=getUiAutomation().executeShellCommand(command);
-    try(InputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)){
-      byte[] buffer=new byte[1024];while(input.read(buffer)!=-1){}
+  private void shell(String command) throws Exception {
+    android.os.ParcelFileDescriptor fd = getUiAutomation().executeShellCommand(command);
+    try (InputStream input = new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)) {
+      byte[] buffer = new byte[1024];
+      while (input.read(buffer) != -1) {}
     }
   }
 }

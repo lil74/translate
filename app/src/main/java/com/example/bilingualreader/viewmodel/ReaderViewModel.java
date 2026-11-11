@@ -12,11 +12,13 @@ public final class ReaderViewModel extends BaseViewModel {
     public final Chapter chapter;
     public final String paragraphId;
     public final int offset;
+    public final String sectionTitle;
 
-    Location(Chapter c, String p, int o) {
+    Location(Chapter c, String p, int o, String sectionTitle) {
       chapter = c;
       paragraphId = p;
       offset = o;
+      this.sectionTitle = sectionTitle;
     }
   }
 
@@ -28,6 +30,7 @@ public final class ReaderViewModel extends BaseViewModel {
   public final LiveData<ReaderSettings> settings;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private List<Chapter> chapters = Collections.emptyList();
+  private List<TocEntry> tableOfContents = Collections.emptyList();
   private String bookId;
   private String requestedChapter;
   private String requestedParagraph;
@@ -95,11 +98,13 @@ public final class ReaderViewModel extends BaseViewModel {
         () -> {
           try {
             List<Chapter> loaded = graph.books.getChapters(book);
+            List<TocEntry> loadedContents = readTableOfContents(book);
             ReadingProgress saved = graph.reader.getReadingProgress(book);
             handler.post(
                 () -> {
                   if (token != generation) return;
                   chapters = loaded;
+                  tableOfContents = loadedContents;
                   if (loaded.isEmpty()) {
                     location.setValue(UiState.error("这本书没有可阅读的章节"));
                     return;
@@ -137,9 +142,20 @@ public final class ReaderViewModel extends BaseViewModel {
     open(book, requestedChapter, requestedParagraph);
   }
 
+  private List<TocEntry> readTableOfContents(String book) {
+    try {
+      return graph.books.getTableOfContents(book);
+    } catch (AppException e) {
+      // A missing/unavailable TOC must not prevent reading the existing chapter text.
+      return Collections.emptyList();
+    }
+  }
+
   private void select(Chapter c, String paragraph, int offset) {
     flushProgress();
-    location.setValue(UiState.success(new Location(c, paragraph, offset)));
+    location.setValue(
+        UiState.success(
+            new Location(c, paragraph, offset, ReaderSectionTitle.resolve(c, tableOfContents))));
     chapterId.setValue(c.getChapterId());
   }
 

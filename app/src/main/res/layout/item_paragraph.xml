@@ -1,4 +1,4 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingVertical="16dp">
     <TextView android:id="@+id/original" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/ink" android:fontFamily="serif"/>
-    <TextView android:id="@+id/translated" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/soft_panel" android:textColor="@color/translation"/>
+    <TextView android:id="@+id/translated" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="@drawable/soft_panel" android:textColor="@color/translation"/>
 </LinearLayout>

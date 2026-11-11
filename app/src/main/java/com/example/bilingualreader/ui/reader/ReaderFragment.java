@@ -1,12 +1,15 @@
 package com.example.bilingualreader.ui.reader;
 
 import android.os.Bundle;
-import android.view.View;
+import android.view.*;
 import android.widget.*;
 import androidx.annotation.*;
+import androidx.core.view.MenuProvider;
+import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.*;
 import com.example.bilingualreader.R;
 import com.example.bilingualreader.contract.model.*;
+import com.example.bilingualreader.translation.TranslationConfigStore;
 import com.example.bilingualreader.ui.*;
 import com.example.bilingualreader.viewmodel.*;
 
@@ -20,6 +23,7 @@ public final class ReaderFragment extends BaseFragment {
   private String restoreId;
   private int restoreOffset;
   private ReaderSettings lastSettings;
+  private PopupMenu translationMenu;
 
   public ReaderFragment() {
     super(R.layout.fragment_reader);
@@ -45,23 +49,39 @@ public final class ReaderFragment extends BaseFragment {
     layout = new LinearLayoutManager(requireContext());
     adapter = new ParagraphAdapter();
     adapter.setOnSelectionTranslate(
-        (paragraph, start, end) -> {
+        (paragraph, start, end, bounds) -> {
           androidx.fragment.app.FragmentManager manager = getChildFragmentManager();
-          if (!manager.isStateSaved()
-              && manager.findFragmentByTag(SelectionTranslationSheet.TAG) == null)
-            SelectionTranslationSheet.create(paragraph, start, end)
-                .showNow(manager, SelectionTranslationSheet.TAG);
+          if (manager.isStateSaved()) return;
+          androidx.fragment.app.Fragment previous =
+              manager.findFragmentByTag(SelectionTranslationSheet.TAG);
+          if (previous instanceof SelectionTranslationSheet)
+            ((SelectionTranslationSheet) previous).dismissNow();
+          SelectionTranslationSheet.create(paragraph, start, end, bounds)
+              .showNow(manager, SelectionTranslationSheet.TAG);
         });
     adapter.setStateRestorationPolicy(RecyclerView.Adapter.StateRestorationPolicy.PREVENT);
     list.setLayoutManager(layout);
     list.setAdapter(adapter);
-    vm.command.observe(
-        getViewLifecycleOwner(),
-        command -> {
-          if (command != null && command.status == UiState.Status.LOADING)
-            view.findViewById(R.id.translate).setEnabled(false);
-          else renderTask(view, vm.task.getValue());
-        });
+    requireActivity()
+        .addMenuProvider(
+            new MenuProvider() {
+              @Override
+              public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+                menu.add(0, R.id.reader_translation, 0, R.string.reader_translate_action)
+                    .setIcon(R.drawable.ic_translate)
+                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+              }
+
+              @Override
+              public boolean onMenuItemSelected(@NonNull MenuItem item) {
+                if (item.getItemId() != R.id.reader_translation) return false;
+                showTranslationActions();
+                return true;
+              }
+            },
+            getViewLifecycleOwner(),
+            Lifecycle.State.RESUMED);
+    vm.command.observe(getViewLifecycleOwner(), command -> refreshTranslationMenu());
     list.setItemAnimator(null);
     list.addOnScrollListener(
         new RecyclerView.OnScrollListener() {
@@ -80,9 +100,19 @@ public final class ReaderFragment extends BaseFragment {
           view.findViewById(R.id.retry_reading)
               .setVisibility(s.status == UiState.Status.ERROR ? View.VISIBLE : View.GONE);
           ((TextView) view.findViewById(R.id.error)).setText(s.message);
-          view.findViewById(R.id.translate).setEnabled(s.data != null);
+          updateChapterToolbar();
+          refreshTranslationMenu();
           if (s.data != null) {
-            ((TextView) view.findViewById(R.id.chapter_title)).setText(s.data.chapter.getTitle());
+            androidx.fragment.app.Fragment lookup =
+                getChildFragmentManager().findFragmentByTag(SelectionTranslationSheet.TAG);
+            if (lookup instanceof SelectionTranslationSheet
+                && lookup.getArguments() != null
+                && !s.data
+                    .chapter
+                    .getChapterId()
+                    .equals(lookup.getArguments().getString("chapterId")))
+              ((SelectionTranslationSheet) lookup).dismiss();
+
             adapter.submit(java.util.Collections.emptyList());
             ReadingProgress viewport = vm.getViewport(s.data.chapter.getChapterId());
             restoreId = viewport == null ? s.data.paragraphId : viewport.getParagraphId();
@@ -131,39 +161,6 @@ public final class ReaderFragment extends BaseFragment {
     renderTask(view, null);
     vm.task.observe(getViewLifecycleOwner(), t -> renderTask(view, t));
     view.findViewById(R.id.retry_reading).setOnClickListener(v -> vm.retryOpen());
-    view.findViewById(R.id.translate).setOnClickListener(v -> {
-      com.example.bilingualreader.translation.TranslationConfigStore config = graph().translationConfig;
-      if (config == null && !graph().demo) {
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-            .setTitle("翻译当前章节").setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
-            .setNegativeButton("暂不翻译", null)
-            .setPositiveButton("继续", (dialog, which) -> vm.translate()).show();
-      } else if (config != null && config.needsConsent()) {
-        String endpoint = config.endpoint();
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-            .setTitle("发送本章原文用于翻译？")
-            .setMessage("本章英语原文会发送到：\n" + endpoint + "\n\n译文会保存在手机中。请确认你同意向该服务发送原文。")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("同意并翻译", (dialog, which) -> {
-              if (endpoint.equals(config.endpoint())) { config.consent(endpoint); vm.translate(); }
-            }).show();
-      } else vm.translate();
-    });
-    view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
-    view.findViewById(R.id.retranslate).setOnClickListener(v -> {
-      com.example.bilingualreader.translation.TranslationConfigStore config=graph().translationConfig;
-      String endpoint=config==null?"":config.endpoint();
-      String mode=config==null?"":config.mode();
-      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-          .setTitle("重新翻译本章？")
-          .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
-          .setNegativeButton("取消",null)
-          .setPositiveButton("重新翻译",(dialog,which)->{
-            if(config!=null && endpoint.equals(config.endpoint()) && mode.equals(config.mode())) {
-              config.consent(endpoint);vm.retranslate();
-            }
-          }).show();
-    });
     view.findViewById(R.id.previous)
         .setOnClickListener(
             v -> {
@@ -193,11 +190,35 @@ public final class ReaderFragment extends BaseFragment {
         requireArguments().getString("paragraph"));
   }
 
-  private void renderTask(View view, TranslationTask t) {
-    boolean active =
-        t != null && (t.getState() == TaskState.RUNNING || t.getState() == TaskState.QUEUED);
+  private void renderTask(View view, TranslationTask task) {
+    adapter.running(isTranslationActive());
+    refreshTranslationMenu();
+  }
+
+  private boolean isTranslationActive() {
+    TranslationTask t = vm.task.getValue();
+    return t != null && (t.getState() == TaskState.QUEUED || t.getState() == TaskState.RUNNING);
+  }
+
+  public String getTranslationAction() {
+    TranslationTask t = vm.task.getValue();
+    if (t == null) return getString(R.string.reader_translate_action);
+    switch (t.getState()) {
+      case COMPLETED:
+        return getString(R.string.reader_translate_action);
+      case CANCELLED:
+        return "继续翻译";
+      case FAILED:
+      case PARTIAL_FAILED:
+        return "重试未完成段落";
+      default:
+        return getString(R.string.reader_translate_action);
+    }
+  }
+
+  public String getTranslationStatus() {
+    TranslationTask t = vm.task.getValue();
     String label = "未翻译 · 原文可直接阅读";
-    String button = "翻译本章";
     if (t != null) {
       switch (t.getState()) {
         case QUEUED:
@@ -208,42 +229,133 @@ public final class ReaderFragment extends BaseFragment {
           break;
         case COMPLETED:
           label = "本章翻译完成";
-          button = "翻译本章";
           break;
         case CANCELLED:
           label = "已取消 · 已完成译文已保留";
-          button = "继续翻译";
           break;
         case FAILED:
         case PARTIAL_FAILED:
           label = t.getErrorMessage() == null ? "翻译未完成" : t.getErrorMessage();
-          button = "重试未完成段落";
           break;
       }
       label += " · " + t.getSuccessCount() + " / " + t.getTotalCount();
+      if (t.getFailedCount() > 0) label += " · 失败 " + t.getFailedCount();
     }
-    if (graph().demo || graph().translationConfig != null
-        && com.example.bilingualreader.translation.TranslationConfigStore.MOCK
-            .equals(graph().translationConfig.mode())) label = "模拟验证 · " + label;
-    ((TextView) view.findViewById(R.id.task_status)).setText(label);
-    ProgressBar bar = view.findViewById(R.id.progress);
-    bar.setProgress(
-        t == null
-            ? 0
-            : t.getTotalCount() == 0
-                ? 100
-                : Math.round(t.getSuccessCount() * 100f / t.getTotalCount()));
-    if (t != null) label += " · 失败 " + t.getFailedCount();
-    ((TextView) view.findViewById(R.id.task_status)).setText(label);
-    ((Button) view.findViewById(R.id.translate)).setText(button);
-    view.findViewById(R.id.translate)
-        .setEnabled(
-            !active && vm.location.getValue() != null && vm.location.getValue().data != null);
-    view.findViewById(R.id.cancel).setVisibility(active ? View.VISIBLE : View.GONE);
-    view.findViewById(R.id.retranslate).setVisibility(!active && t!=null && t.getSuccessCount()>0
-        && graph().translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator
-        ? View.VISIBLE : View.GONE);
-    adapter.running(active);
+    TranslationConfigStore config = graph().translationConfig;
+    boolean demo =
+        config == null ? graph().demo : TranslationConfigStore.MOCK.equals(config.mode());
+    return demo ? "模拟验证 · " + label : label;
+  }
+
+  /** The compact toolbar icon opens text actions and the latest progress only on demand. */
+  public PopupMenu showTranslationActions() {
+    View anchor = requireActivity().findViewById(R.id.reader_translation);
+    if (anchor == null) anchor = requireActivity().findViewById(R.id.toolbar);
+    if (translationMenu != null) translationMenu.dismiss();
+    PopupMenu popup = new PopupMenu(requireContext(), anchor);
+    translationMenu = popup;
+    populateTranslationMenu(popup.getMenu());
+    popup.setOnMenuItemClickListener(
+        item -> {
+          if (item.getItemId() == R.id.translate) {
+            remember();
+            requestChapterTranslation();
+            return true;
+          }
+          if (item.getItemId() == R.id.cancel) {
+            vm.cancel();
+            return true;
+          }
+          if (item.getItemId() == R.id.retranslate) {
+            remember();
+            requestChapterRetranslation();
+            return true;
+          }
+          return false;
+        });
+    popup.setOnDismissListener(
+        menu -> {
+          if (translationMenu == menu) translationMenu = null;
+        });
+    popup.show();
+    return popup;
+  }
+
+  private void requestChapterTranslation() {
+    TranslationConfigStore config = graph().translationConfig;
+    if (config == null && !graph().demo) {
+      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle("翻译当前章节")
+          .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
+          .setNegativeButton("暂不翻译", null)
+          .setPositiveButton("继续", (dialog, which) -> vm.translate())
+          .show();
+    } else if (config != null && config.needsConsent()) {
+      String endpoint = config.endpoint();
+      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle("发送本章原文用于翻译？")
+          .setMessage("本章英语原文会发送到：\n" + endpoint + "\n\n译文会保存在手机中。请确认你同意向该服务发送原文。")
+          .setNegativeButton("取消", null)
+          .setPositiveButton(
+              "同意并翻译",
+              (dialog, which) -> {
+                if (TranslationConfigStore.ONLINE.equals(config.mode())
+                    && endpoint.equals(config.endpoint())) {
+                  config.consent(endpoint);
+                  vm.translate();
+                }
+              })
+          .show();
+    } else vm.translate();
+  }
+
+  private void requestChapterRetranslation() {
+    TranslationConfigStore config=graph().translationConfig;
+    UiState<ReaderViewModel.Location> location=vm.location.getValue();
+    if(config==null || location==null || location.data==null)return;
+    String chapter=location.data.chapter.getChapterId(),endpoint=config.endpoint(),mode=config.mode();
+    new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        .setTitle(R.string.reader_retranslate_action)
+        .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
+        .setNegativeButton("取消",null)
+        .setPositiveButton(R.string.reader_retranslate_action,(dialog,which)->{
+          UiState<ReaderViewModel.Location> current=vm.location.getValue();
+          if(endpoint.equals(config.endpoint()) && mode.equals(config.mode())
+              && current!=null && current.data!=null && chapter.equals(current.data.chapter.getChapterId())) {
+            config.consent(endpoint);vm.retranslate();
+          }
+        }).show();
+  }
+
+  private void populateTranslationMenu(Menu menu) {
+    menu.clear();
+    menu.add(0, R.id.task_status, 0, getTranslationStatus()).setEnabled(false);
+    UiState<ReaderViewModel.Location> location = vm.location.getValue();
+    UiState<String> command = vm.command.getValue();
+    boolean busy = command != null && command.status == UiState.Status.LOADING;
+    menu.add(0, R.id.translate, 1, getTranslationAction())
+        .setEnabled(location != null && location.data != null && !isTranslationActive() && !busy);
+    if (isTranslationActive()) menu.add(0, R.id.cancel, 2, "取消任务").setEnabled(!busy);
+    TranslationTask task=vm.task.getValue();
+    if(!isTranslationActive() && task!=null && task.getSuccessCount()>0 && graph().translationConfig!=null
+        && graph().translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator)
+      menu.add(0,R.id.retranslate,3,R.string.reader_retranslate_action)
+          .setEnabled(location!=null && location.data!=null && !busy);
+  }
+
+  private void refreshTranslationMenu() {
+    if (translationMenu != null) populateTranslationMenu(translationMenu.getMenu());
+  }
+
+  private void updateChapterToolbar() {
+    if (!isResumed()) return;
+    UiState<ReaderViewModel.Location> state = vm.location.getValue();
+    host()
+        .page(
+            state != null && state.data != null
+                ? state.data.sectionTitle
+                : getString(R.string.reader_loading_title),
+            true);
   }
 
   private void restore() {
@@ -285,6 +397,10 @@ public final class ReaderFragment extends BaseFragment {
 
   @Override
   public void onDestroyView() {
+    if (translationMenu != null) {
+      translationMenu.dismiss();
+      translationMenu = null;
+    }
     list = null;
     lastSettings = null;
     super.onDestroyView();
@@ -293,6 +409,6 @@ public final class ReaderFragment extends BaseFragment {
   @Override
   public void onResume() {
     super.onResume();
-    host().page("双语阅读", true);
+    updateChapterToolbar();
   }
 }
