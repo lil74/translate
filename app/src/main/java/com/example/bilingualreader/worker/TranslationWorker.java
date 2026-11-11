@@ -26,7 +26,8 @@ public final class TranslationWorker extends Worker {
         if (task == null || (task.getState() != TaskState.QUEUED && task.getState() != TaskState.RUNNING))
           return Result.success();
         String[] selection = graph.translationStore.getService(id);
-        service = AppGraphFactory.service(selection[0], selection[1]);
+        service = AppGraphFactory.service(selection[0], selection[1],
+            graph.translationConfig == null ? "" : graph.translationConfig.tokenForEndpoint(selection[1]));
         ChapterTranslationRunner.Outcome result = new ChapterTranslationRunner(graph.translationStore,
             service, this::isStopped, System::currentTimeMillis).run(id);
         return result == ChapterTranslationRunner.Outcome.RETRY ? Result.retry() : Result.success();

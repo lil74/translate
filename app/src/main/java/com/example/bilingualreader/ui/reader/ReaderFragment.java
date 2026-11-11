@@ -150,6 +150,20 @@ public final class ReaderFragment extends BaseFragment {
       } else vm.translate();
     });
     view.findViewById(R.id.cancel).setOnClickListener(v -> vm.cancel());
+    view.findViewById(R.id.retranslate).setOnClickListener(v -> {
+      com.example.bilingualreader.translation.TranslationConfigStore config=graph().translationConfig;
+      String endpoint=config==null?"":config.endpoint();
+      String mode=config==null?"":config.mode();
+      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+          .setTitle("重新翻译本章？")
+          .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
+          .setNegativeButton("取消",null)
+          .setPositiveButton("重新翻译",(dialog,which)->{
+            if(config!=null && endpoint.equals(config.endpoint()) && mode.equals(config.mode())) {
+              config.consent(endpoint);vm.retranslate();
+            }
+          }).show();
+    });
     view.findViewById(R.id.previous)
         .setOnClickListener(
             v -> {
@@ -226,6 +240,9 @@ public final class ReaderFragment extends BaseFragment {
         .setEnabled(
             !active && vm.location.getValue() != null && vm.location.getValue().data != null);
     view.findViewById(R.id.cancel).setVisibility(active ? View.VISIBLE : View.GONE);
+    view.findViewById(R.id.retranslate).setVisibility(!active && t!=null && t.getSuccessCount()>0
+        && graph().translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator
+        ? View.VISIBLE : View.GONE);
     adapter.running(active);
   }
 

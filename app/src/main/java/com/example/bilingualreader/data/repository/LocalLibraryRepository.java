@@ -22,22 +22,16 @@ import java.util.*;
 
 /** Blocking commands are called from the ViewModel executor or Worker. */
 public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationRuntimeStore {
+  private static final Object IMPORT_LOCK=new Object();
   private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
   public LocalLibraryRepository(Context context) {
     this.context=context.getApplicationContext();
     db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db")
         .addMigrations(LibraryDatabase.MIGRATION_1_2).build();dao=db.dao();
+    new Thread(this::cleanupOrphans,"epub-cleanup").start();
   }
   public LocalLibraryRepository(Context context, LibraryDatabase database) {
     this.context=context.getApplicationContext(); this.db=database; this.dao=db.dao();
-public final class LocalLibraryRepository implements BookRepository,ReaderRepository,TranslationStore {
-  private static final Object IMPORT_LOCK=new Object();
-  private static final Object TASK_LOCK=new Object();
-  private final Context context; private final LibraryDatabase db; private final DaoAccess dao;
-  public LocalLibraryRepository(Context context) {
-    this.context=context.getApplicationContext();
-    db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db").build();dao=db.dao();
-    new Thread(this::cleanupOrphans,"epub-cleanup").start();
   }
   private void cleanupOrphans(){
     try{
@@ -202,13 +196,21 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
   }
   private TranslationTask prepare(String chapterId, String source, String target,
       String mode, String endpoint) throws AppException {
+    return prepare(chapterId,source,target,mode,endpoint,false);
+  }
+  @Override public TranslationTask prepareFreshConfiguredTask(String chapterId,String source,String target,
+      String mode,String endpoint)throws AppException {
+    return prepare(chapterId,source,target,mode,endpoint,true);
+  }
+  private TranslationTask prepare(String chapterId, String source, String target,
+      String mode, String endpoint, boolean fresh) throws AppException {
     if (!"en".equals(source) || !"zh-CN".equals(target))
       throw err(ErrorCode.UNSUPPORTED_LANGUAGE, "仅支持英语翻译为简体中文");
     return transaction(() -> {
       if (dao.chapter(chapterId) == null) throw err(ErrorCode.CHAPTER_NOT_FOUND, "章节不存在");
       TaskRow existing = dao.activeTask(chapterId, source, target);
       if (existing != null) {
-        if (mode.isEmpty() || (mode.equals(existing.executionMode) && endpoint.equals(existing.endpoint)))
+        if (!fresh && (mode.isEmpty() || (mode.equals(existing.executionMode) && endpoint.equals(existing.endpoint))))
           return task(existing);
         // Supersede the old service snapshot before it can write late results.
         cancelTask(existing.taskId);
@@ -219,7 +221,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
       t.createdAt = t.updatedAt = System.currentTimeMillis();
       List<ParagraphRow> paragraphs = dao.paragraphs(chapterId); t.totalCount = paragraphs.size();
       for (ParagraphRow p : paragraphs) {
-        if (success(p, target, source, mode)) t.successCount++;
+        if (!fresh && success(p, target, source, mode)) t.successCount++;
         else dao.putTranslation(row(p, t, "PENDING"));
       }
       if (t.successCount == t.totalCount) t.state = "COMPLETED";
