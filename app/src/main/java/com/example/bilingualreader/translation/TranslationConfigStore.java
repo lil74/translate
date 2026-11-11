@@ -12,7 +12,8 @@ public final class TranslationConfigStore {
   private volatile Runnable onChanged;
   private final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
     Runnable callback = onChanged;
-    if (callback != null && ("mode".equals(key) || "endpoint".equals(key))) callback.run();
+    if (callback != null && ("mode".equals(key) || "endpoint".equals(key)
+        || key != null && key.startsWith("gatewayToken:"))) callback.run();
   };
   public TranslationConfigStore(Context context, boolean debug) {
     prefs = context.getSharedPreferences("translation_settings", Context.MODE_PRIVATE);
@@ -26,6 +27,25 @@ public final class TranslationConfigStore {
   public void save(String mode, String endpoint) throws AppException {
     validate(mode, endpoint);
     prefs.edit().putString("mode", mode).putString("endpoint", endpoint.trim()).apply();
+  }
+  private String tokenKey(String endpoint) { return "gatewayToken:" + TranslationValidation.sha256(endpoint.trim()); }
+  public String tokenForEndpoint(String endpoint) throws AppException {
+    String address=endpoint.trim();
+    return ServiceTokenVault.decrypt(address,prefs.getString(tokenKey(address),""));
+  }
+  public boolean hasToken(String endpoint) { return prefs.contains(tokenKey(endpoint)); }
+  /** Null retains a saved token; empty explicitly removes it. Tokens never enter task/Worker data. */
+  public void save(String mode,String endpoint,String token)throws AppException {
+    validate(mode,endpoint);String address=endpoint.trim();
+    SharedPreferences.Editor editor=prefs.edit().putString("mode",mode).putString("endpoint",address);
+    if(token!=null) {
+      token=token.trim();
+      if(token.length()>2048 || token.chars().anyMatch(c -> c<33 || c>126))
+        throw new AppException(ErrorCode.AUTH_FAILED,"服务访问令牌格式无效",false);
+      if(token.isEmpty())editor.remove(tokenKey(address));
+      else editor.putString(tokenKey(address),ServiceTokenVault.encrypt(address,token));
+    }
+    editor.apply();
   }
   public void validate(String mode, String endpoint) throws AppException {
     if (MOCK.equals(mode) && debug) return;

@@ -15,6 +15,9 @@ public final class TranslationBookRepository implements BookRepository {
     this.books = books; this.store = store; this.coordinator = coordinator;
   }
   public ImportResult importBook(Uri source) throws AppException { return books.importBook(source); }
+  @Override public ImportResult importBook(Uri source, String chapterRegex) throws AppException {
+    return books.importBook(source, chapterRegex);
+  }
   public LiveData<List<Book>> observeBooks() { return books.observeBooks(); }
   public List<Chapter> getChapters(String id) throws AppException { return books.getChapters(id); }
   public List<TocEntry> getTableOfContents(String id) throws AppException { return books.getTableOfContents(id); }

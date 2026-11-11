@@ -11,6 +11,7 @@ import java.util.*;
 /** Blocking adapter for a team-owned, keyless LibreTranslate endpoint. Call off the UI thread. */
 public final class LibreTranslateService implements TranslationService {
   private final URL endpoint;
+  private final String accessToken;
   private volatile HttpURLConnection activeConnection;
   private volatile boolean cancelled;
 
@@ -21,7 +22,13 @@ public final class LibreTranslateService implements TranslationService {
   }
 
   public LibreTranslateService(String endpoint) throws MalformedURLException {
+    this(endpoint, "");
+  }
+  public LibreTranslateService(String endpoint, String accessToken) throws MalformedURLException {
     this.endpoint = new URL(endpoint);
+    if (accessToken == null || accessToken.length()>2048 || accessToken.chars().anyMatch(c -> c<33 || c>126))
+      throw new IllegalArgumentException("Invalid gateway access token");
+    this.accessToken = accessToken;
     String host = this.endpoint.getHost();
     boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host);
     if (!("https".equals(this.endpoint.getProtocol())
@@ -41,14 +48,25 @@ public final class LibreTranslateService implements TranslationService {
       if (cancelled || Thread.currentThread().isInterrupted()) {
         throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译验证已中断", false);
       }
+      ProviderText translated = translateOne(item.getText());
       outputs.add(new TranslationOutput(item.getParagraphId(), item.getSourceHash(),
-          TranslationStatus.SUCCESS, translateOne(item.getText()), "libretranslate", null, null));
+          TranslationStatus.SUCCESS, translated.text, translated.provider, translated.version, null));
     }
     return TranslationValidation.validateResult(request,
         new TranslationBatchResult(request.getTaskId(), request.getRequestId(), outputs));
   }
 
-  private String translateOne(String text) throws AppException {
+  private static final class ProviderText {
+    final String text,provider,version;
+    ProviderText(String text,String provider,String version){this.text=text;this.provider=provider;this.version=version;}
+  }
+  private String metadata(JsonObject response,String name,String fallback)throws AppException {
+    JsonElement value=response.get(name);if(value==null||value.isJsonNull())return fallback;
+    if(!value.isJsonPrimitive()||!value.getAsJsonPrimitive().isString()
+        ||TranslationValidation.isBlank(value.getAsString())||value.getAsString().length()>128)throw invalid();
+    return value.getAsString();
+  }
+  private ProviderText translateOne(String text) throws AppException {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
@@ -60,6 +78,7 @@ public final class LibreTranslateService implements TranslationService {
       connection.setRequestMethod("POST");
       connection.setDoOutput(true);
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+      if (!accessToken.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + accessToken);
       JsonObject payload = new JsonObject();
       payload.addProperty("q", text);
       payload.addProperty("source", "en");
@@ -95,7 +114,8 @@ public final class LibreTranslateService implements TranslationService {
       if (translated == null || !translated.isJsonPrimitive()
           || !translated.getAsJsonPrimitive().isString()
           || TranslationValidation.isBlank(translated.getAsString())) throw invalid();
-      return translated.getAsString();
+      return new ProviderText(translated.getAsString(),metadata(response,"provider","libretranslate"),
+          metadata(response,"engineVersion",null));
     } catch (SocketTimeoutException timeout) {
       throw new AppException(ErrorCode.TIMEOUT, "翻译服务连接或读取超时", true, timeout);
     } catch (IOException network) {

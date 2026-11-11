@@ -26,11 +26,18 @@ public final class WorkTranslationCoordinator implements TranslationCoordinator 
     return task != null && (task.getState() == TaskState.QUEUED || task.getState() == TaskState.RUNNING);
   }
   @Override public String startOrResumeChapter(String chapterId, String source, String target) throws AppException {
+    return start(chapterId,source,target,false);
+  }
+  public String retranslateChapter(String chapterId,String source,String target)throws AppException {
+    return start(chapterId,source,target,true);
+  }
+  private String start(String chapterId,String source,String target,boolean fresh)throws AppException {
     synchronized (COMMAND_LOCK) {
       String mode = config.mode(), endpoint = config.endpoint();
       config.validate(mode, endpoint);
       if (config.needsConsent(mode, endpoint)) throw new AppException(ErrorCode.AUTH_FAILED, "请先确认向翻译服务发送本章原文", false);
-      TranslationTask task = store.prepareConfiguredTask(chapterId, source, target, mode, endpoint);
+      TranslationTask task = fresh ? store.prepareFreshConfiguredTask(chapterId,source,target,mode,endpoint)
+          : store.prepareConfiguredTask(chapterId, source, target, mode, endpoint);
       if (active(task)) ensureScheduled(task);
       return task.getTaskId();
     }
