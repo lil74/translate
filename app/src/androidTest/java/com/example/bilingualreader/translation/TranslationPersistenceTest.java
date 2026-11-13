@@ -93,6 +93,16 @@ public class TranslationPersistenceTest {
     assertEquals("test",db.dao().translation("p0","zh-CN").provider);
     assertTrue(store.getPendingParagraphs(mock.getTaskId()).isEmpty());
   }
+  @Test public void explicitRetranslationDoesNotReusePreviousGenuineCache() throws Exception {
+    TranslationTask old=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(old.getTaskId());
+    TranslationTask fresh=store.prepareFreshConfiguredTask("test-chapter","en","zh-CN","online","https://team.example/translate");
+    assertNotEquals(old.getTaskId(),fresh.getTaskId());assertEquals(0,fresh.getSuccessCount());
+    assertEquals(3,store.getPendingParagraphs(fresh.getTaskId()).size());
+    assertEquals("PENDING",db.dao().translation("p0","zh-CN").status);
+    new ChapterTranslationRunner(store,TranslationPersistenceTest::success,()->false,System::currentTimeMillis).run(fresh.getTaskId());
+    assertEquals(TaskState.COMPLETED,store.getTask(fresh.getTaskId()).getState());
+  }
   @Test public void serviceChangeCancelsOldTaskAndRejectsItsLateResponse() throws Exception {
     TranslationTask mock=prepare();
     TranslationTask online=store.prepareConfiguredTask("test-chapter","en","zh-CN","online","https://one.example/translate");
@@ -212,6 +222,20 @@ public class TranslationPersistenceTest {
       assertEquals(task.getTaskId(),upgraded.getActiveTasks().get(0).getTaskId());
       assertEquals("",upgraded.getService(task.getTaskId())[0]);
     } finally {disk.close();context.deleteDatabase(name);}
+  }
+  @Test public void appGraphForwardsCustomTxtChapterRule() throws Exception {
+    AppContainer graph=((ReaderApplication)context.getApplicationContext()).getContainer();
+    File text=File.createTempFile("merged-txt-test-",".txt",context.getCacheDir());
+    String bookId=null;
+    try {
+      try(Writer writer=new OutputStreamWriter(new FileOutputStream(text),java.nio.charset.StandardCharsets.UTF_8)) {
+        writer.write("Episode 1\nHello, world!\nEpisode 2\nAnother sentence. "+UUID.randomUUID());
+      }
+      bookId=graph.books.importBook(android.net.Uri.fromFile(text),"^Episode [0-9]+$").getBook().getBookId();
+      List<Chapter> chapters=graph.books.getChapters(bookId);
+      assertEquals(2,chapters.size());assertEquals("Episode 1",chapters.get(0).getTitle());
+      assertEquals("Episode 2",chapters.get(1).getTitle());
+    } finally {if(bookId!=null)graph.books.deleteBook(bookId);text.delete();}
   }
   @Test public void workManagerTranslatesAnImportedBookAndCacheAvoidsSecondRequest() throws Exception {
     AppContainer graph=((ReaderApplication)context.getApplicationContext()).getContainer();

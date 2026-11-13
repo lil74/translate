@@ -13,21 +13,27 @@ public final class AppGraphFactory {
     WorkTranslationCoordinator coordinator = new WorkTranslationCoordinator(context, library, config);
     AppContainer graph = new AppContainer(new TranslationBookRepository(library, library, coordinator), library,
         new PreferencesSettingsRepository(context), coordinator, false,
-        selectionService(config.mode(), config.endpoint()), TranslationConfigStore.MOCK.equals(config.mode()), library, config);
+        selectionService(config, config.mode(), config.endpoint()), TranslationConfigStore.MOCK.equals(config.mode()), library, config);
     config.setOnChanged(() -> graph.setSelectionTranslation(
-        selectionService(config.mode(), config.endpoint()), TranslationConfigStore.MOCK.equals(config.mode())));
+        selectionService(config, config.mode(), config.endpoint()), TranslationConfigStore.MOCK.equals(config.mode())));
     return graph;
   }
-  private static TranslationService selectionService(String mode, String endpoint) {
+  private static TranslationService selectionService(TranslationConfigStore config, String mode, String endpoint) {
     // Captured settings: a retained sheet cannot switch provider after user confirmation.
-    return new IsolatedSelectionTranslationService(() -> service(mode, endpoint));
+    try {
+      String token=config.tokenForEndpoint(endpoint);
+      return new IsolatedSelectionTranslationService(() -> service(mode, endpoint, token));
+    } catch (AppException error) { return request -> { throw error; }; }
   }
   public static TranslationService service(String mode, String endpoint) throws AppException {
+    return service(mode, endpoint, "");
+  }
+  public static TranslationService service(String mode, String endpoint, String token) throws AppException {
     if (TranslationConfigStore.MOCK.equals(mode)) return new FakeTranslationService();
     if (!TranslationConfigStore.ONLINE.equals(mode) || endpoint.isEmpty()) throw TranslationConfigStore.configuration();
     try {
 
-      return new LibreTranslateService(endpoint);
+      return new LibreTranslateService(endpoint, token);
     } catch (java.net.MalformedURLException | IllegalArgumentException invalid) {
       throw TranslationConfigStore.configuration();
     }

@@ -300,6 +300,11 @@ public final class ReaderFragment extends BaseFragment {
             vm.cancel();
             return true;
           }
+          if (item.getItemId() == R.id.retranslate) {
+            remember();
+            requestChapterRetranslation();
+            return true;
+          }
           return false;
         });
     popup.setOnDismissListener(
@@ -338,6 +343,24 @@ public final class ReaderFragment extends BaseFragment {
     } else vm.translate();
   }
 
+  private void requestChapterRetranslation() {
+    TranslationConfigStore config=graph().translationConfig;
+    UiState<ReaderViewModel.Location> location=vm.location.getValue();
+    if(config==null || location==null || location.data==null)return;
+    String chapter=location.data.chapter.getChapterId(),endpoint=config.endpoint(),mode=config.mode();
+    new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        .setTitle(R.string.reader_retranslate_action)
+        .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
+        .setNegativeButton("取消",null)
+        .setPositiveButton(R.string.reader_retranslate_action,(dialog,which)->{
+          UiState<ReaderViewModel.Location> current=vm.location.getValue();
+          if(endpoint.equals(config.endpoint()) && mode.equals(config.mode())
+              && current!=null && current.data!=null && chapter.equals(current.data.chapter.getChapterId())) {
+            config.consent(endpoint);vm.retranslate();
+          }
+        }).show();
+  }
+
   private void populateTranslationMenu(Menu menu) {
     menu.clear();
     menu.add(0, R.id.task_status, 0, getTranslationStatus()).setEnabled(false);
@@ -347,6 +370,11 @@ public final class ReaderFragment extends BaseFragment {
     menu.add(0, R.id.translate, 1, getTranslationAction())
         .setEnabled(location != null && location.data != null && !isTranslationActive() && !busy);
     if (isTranslationActive()) menu.add(0, R.id.cancel, 2, "取消任务").setEnabled(!busy);
+    TranslationTask task=vm.task.getValue();
+    if(!isTranslationActive() && task!=null && task.getSuccessCount()>0 && graph().translationConfig!=null
+        && graph().translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator)
+      menu.add(0,R.id.retranslate,3,R.string.reader_retranslate_action)
+          .setEnabled(location!=null && location.data!=null && !busy);
   }
 
   private void refreshTranslationMenu() {

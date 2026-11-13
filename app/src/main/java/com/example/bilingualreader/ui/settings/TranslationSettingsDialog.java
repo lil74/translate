@@ -14,7 +14,7 @@ public final class TranslationSettingsDialog {
     int padding = (int) (24 * context.getResources().getDisplayMetrics().density);
     fields.setPadding(padding, padding / 2, padding, 0);
     TextView explanation = new TextView(context);
-    explanation.setText("在线服务填写兼容 LibreTranslate 的完整 /translate 地址。关闭模拟后，点击“翻译本章”会重新翻译模拟结果，并保留已有真实译文。正在运行的旧服务任务会在再次点击翻译时被替换。");
+    explanation.setText("填写团队翻译服务的完整 /translate 地址及访问令牌。百炼 API Key 由服务器保存，请勿填写在这里。切换服务后可在阅读页选择“重新翻译”替换旧译文。");
     fields.addView(explanation);
     Switch mock = new Switch(context);
     mock.setText("模拟验证（不会产生真实译文）");
@@ -28,13 +28,23 @@ public final class TranslationSettingsDialog {
     endpoint.setEnabled(!config.allowsMock() || !mock.isChecked());
     mock.setOnCheckedChangeListener((button, checked) -> endpoint.setEnabled(!checked));
     fields.addView(endpoint);
+    EditText token=new EditText(context);
+    token.setSingleLine(true);
+    token.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+    token.setHint("服务访问令牌（留空保留此地址已保存令牌）");
+    token.setSaveEnabled(false);
+    token.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO);
+    fields.addView(token);
+    CheckBox removeToken=new CheckBox(context);
+    removeToken.setText("删除此地址已保存的访问令牌");fields.addView(removeToken);
     androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(context)
         .setTitle("翻译服务").setView(fields).setNegativeButton("取消", null)
         .setPositiveButton("保存", null).create();
     dialog.setOnShowListener(ignored -> dialog.getButton(-1).setOnClickListener(view -> {
       try {
         config.save(config.allowsMock() && mock.isChecked() ? TranslationConfigStore.MOCK
-            : TranslationConfigStore.ONLINE, endpoint.getText().toString().trim());
+            : TranslationConfigStore.ONLINE, endpoint.getText().toString().trim(),
+            removeToken.isChecked() ? "" : token.getText().length()==0 ? null : token.getText().toString());
         Toast.makeText(context, "翻译服务已保存，下次新任务生效", Toast.LENGTH_SHORT).show();
         dialog.dismiss();
       } catch (AppException error) { endpoint.setError(error.getUserMessage()); }

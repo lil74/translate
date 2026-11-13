@@ -199,6 +199,16 @@ public final class ReaderViewModel extends BaseViewModel {
           });
   }
 
+  public void retranslate() {
+    String id=chapterId.getValue();
+    if(id!=null)execute(() -> {
+      if(!(graph.translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator))
+        throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,"当前翻译服务不支持重新翻译",false);
+      ((com.example.bilingualreader.translation.WorkTranslationCoordinator)graph.translation)
+          .retranslateChapter(id,"en","zh-CN");
+      return "已使用当前服务重新翻译本章";
+    });
+  }
   public void cancel() {
     TranslationTask t = task.getValue();
     if (t != null)

@@ -1,0 +1,10 @@
+services:
+  translation:
+    build: ../../backend
+    env_file: .env
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:8000:8000"

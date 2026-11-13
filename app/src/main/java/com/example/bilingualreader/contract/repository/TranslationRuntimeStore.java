@@ -23,6 +23,10 @@ public interface TranslationRuntimeStore extends TranslationStore {
     return task;
   }
   List<TranslationTask> getActiveTasks() throws AppException;
+  default TranslationTask prepareFreshConfiguredTask(String chapterId,String source,String target,
+      String mode,String endpoint)throws AppException {
+    throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,"当前数据实现不支持重新翻译",false);
+  }
   List<TranslationTask> getBookTasks(String bookId) throws AppException;
   void bindService(String taskId, String mode, String endpoint) throws AppException;
   String[] getService(String taskId) throws AppException;

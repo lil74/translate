@@ -1,0 +1,23 @@
+[Unit]
+Description=BilingualReader Qwen translation gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=readertranslate
+Group=readertranslate
+WorkingDirectory=/opt/bilingualreader/app
+EnvironmentFile=/opt/bilingualreader/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/bilingualreader/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 --timeout 35 --error-logfile - gateway:application
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
