@@ -42,13 +42,13 @@ public final class LibreTranslateService implements TranslationService {
         throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译验证已中断", false);
       }
       outputs.add(new TranslationOutput(item.getParagraphId(), item.getSourceHash(),
-          TranslationStatus.SUCCESS, translateOne(item.getText()), "libretranslate", null, null));
+          TranslationStatus.SUCCESS, translateOne(item.getText(), request.getSourceLanguage(), request.getTargetLanguage()), "libretranslate", null, null));
     }
     return TranslationValidation.validateResult(request,
         new TranslationBatchResult(request.getTaskId(), request.getRequestId(), outputs));
   }
 
-  private String translateOne(String text) throws AppException {
+  private String translateOne(String text, String source, String target) throws AppException {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
@@ -62,8 +62,8 @@ public final class LibreTranslateService implements TranslationService {
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       JsonObject payload = new JsonObject();
       payload.addProperty("q", text);
-      payload.addProperty("source", "en");
-      payload.addProperty("target", "zh");
+      payload.addProperty("source", "zh-CN".equals(source) ? "zh" : source);
+      payload.addProperty("target", "zh-CN".equals(target) ? "zh" : target);
       payload.addProperty("format", "text");
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);

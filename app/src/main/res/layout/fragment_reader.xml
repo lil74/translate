@@ -1,12 +1,32 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
-    <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"/>
-    <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" style="@style/MutedText" android:visibility="gone"/>
-    <com.google.android.material.button.MaterialButton android:id="@+id/retry_reading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="重新加载章节" android:visibility="gone"/>
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="24dp" android:text="@string/selection_hint" style="@style/MutedText"/>
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:paddingHorizontal="24dp" android:clipToPadding="false"/>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="16dp" android:gravity="center">
-        <com.google.android.material.button.MaterialButton android:id="@+id/previous" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="上一章"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/toc" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="目录"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/next" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="下一章"/>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+      <TextView android:id="@+id/reader_book_name" android:layout_width="match_parent" android:layout_height="30dp" android:gravity="center_vertical" android:paddingHorizontal="24dp" android:textSize="13sp" android:textColor="@color/muted" android:singleLine="true" android:ellipsize="end"/>
+      <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:paddingHorizontal="24dp" android:paddingVertical="12dp" android:clipToPadding="false"/>
+      <LinearLayout android:id="@+id/reader_footer" android:layout_width="match_parent" android:layout_height="32dp" android:paddingHorizontal="24dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/reader_footer_chapter" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="@color/muted" android:singleLine="true" android:ellipsize="end"/>
+        <TextView android:id="@+id/reader_footer_progress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="12dp" android:textSize="12sp" android:textColor="@color/muted"/>
+      </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:orientation="vertical" android:gravity="center">
+      <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp"/>
+      <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" style="@style/MutedText" android:visibility="gone"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/retry_reading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="重新加载章节" android:visibility="gone"/>
+    </LinearLayout>
+    <com.google.android.material.appbar.MaterialToolbar android:id="@+id/reader_toolbar" android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/surface" android:elevation="6dp" android:visibility="gone"/>
+    <LinearLayout android:id="@+id/reader_bottom" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="vertical" android:background="@color/surface" android:elevation="6dp" android:visibility="gone">
+      <ScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:fillViewport="true">
+        <LinearLayout android:id="@+id/reader_panel" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="20dp"/>
+      </ScrollView>
+      <LinearLayout android:id="@+id/chapter_switch" android:visibility="gone" android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center">
+        <com.google.android.material.button.MaterialButton android:id="@+id/previous" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="72dp" android:layout_height="48dp" android:text="上一章"/>
+        <TextView android:id="@+id/reader_chapter_label" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:gravity="center" android:maxLines="2" android:ellipsize="end" android:textSize="14sp"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/next" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="72dp" android:layout_height="48dp" android:text="下一章"/>
+      </LinearLayout>
+      <LinearLayout android:layout_width="match_parent" android:layout_height="72dp" android:gravity="center">
+        <TextView android:id="@+id/reader_settings" style="@style/ReaderDockButton" android:text="设置" android:drawableTop="@drawable/reader_font" android:drawablePadding="4dp" android:paddingVertical="8dp"/>
+        <TextView android:id="@+id/reader_background" style="@style/ReaderDockButton" android:text="背景" android:drawableTop="@drawable/reader_sun" android:drawablePadding="4dp" android:paddingVertical="8dp"/>
+        <TextView android:id="@+id/reader_chapters" style="@style/ReaderDockButton" android:text="切换章节" android:drawableTop="@drawable/reader_switch" android:drawablePadding="4dp" android:paddingVertical="8dp"/>
+        <TextView android:id="@+id/toc" style="@style/ReaderDockButton" android:text="目录" android:drawableTop="@drawable/reader_list" android:drawablePadding="4dp" android:paddingVertical="8dp"/>
+      </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

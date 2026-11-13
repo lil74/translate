@@ -50,3 +50,8 @@ return new AppContainer(books, reader,
 ```
 
 将来确需改签名时，先修改 PROJECT_SPEC 的版本号和本文件，再同时修改 contract、模拟实现、正式实现和调用方；不要各自再定义同名 Book 或 Paragraph。
+
+
+## 2026-11-13：首页独立互译补充
+
+首页临时查询复用 TranslationService，允许 `en → zh-CN` 和 `zh-CN → en`；共享校验器同步接受这两个方向。LibreTranslate 供应商边界将 `zh-CN` 映射为 `zh`。整章和阅读选词仍为 `en → zh-CN`，首页请求使用数据库外的 `lookup:<UUID>`，不写书籍缓存。完整约定和本轮共享代码变更见 [C_HOME_LOOKUP.md](C_HOME_LOOKUP.md)。

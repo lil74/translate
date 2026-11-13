@@ -76,6 +76,10 @@ public final class MainActivity extends AppCompatActivity {
         .commit();
   }
 
+  public void openLookup() {
+    push(new com.example.bilingualreader.ui.lookup.LookupFragment());
+  }
+
   public void openToc(String book, String title) {
     push(TocFragment.create(book, title));
   }

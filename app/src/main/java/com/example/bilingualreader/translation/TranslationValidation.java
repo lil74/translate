@@ -29,9 +29,12 @@ public final class TranslationValidation {
 
   public static void validateRequest(TranslationBatchRequest request) throws AppException {
     if (request == null) throw invalid("翻译请求为空");
-    if (!"en".equals(request.getSourceLanguage())
-        || !"zh-CN".equals(request.getTargetLanguage())) {
-      throw new AppException(ErrorCode.UNSUPPORTED_LANGUAGE, "第一版仅支持英语到简体中文", false);
+    boolean forward = "en".equals(request.getSourceLanguage())
+        && "zh-CN".equals(request.getTargetLanguage());
+    boolean reverse = "zh-CN".equals(request.getSourceLanguage())
+        && "en".equals(request.getTargetLanguage());
+    if (!forward && !reverse) {
+      throw new AppException(ErrorCode.UNSUPPORTED_LANGUAGE, "当前仅支持英语与简体中文互译", false);
     }
     if (isBlank(request.getTaskId()) || isBlank(request.getRequestId())
         || request.getItems().isEmpty() || request.getItems().size() > 8) {

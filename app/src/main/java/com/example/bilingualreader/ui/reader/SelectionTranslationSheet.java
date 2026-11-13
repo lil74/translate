@@ -95,17 +95,15 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
                   @NonNull
                   public <T extends ViewModel> T create(@NonNull Class<T> type) {
                     AppContainer.SelectionBinding binding = graph.selectionBinding();
-                    return type.cast(new SelectionTranslationViewModel(binding.service, binding.demo));
+                    return type.cast(
+                        new SelectionTranslationViewModel(binding.service, binding.demo));
                   }
                 })
             .get(SelectionTranslationViewModel.class);
     String selected = requireArguments().getString("selected", "");
     ((TextView) view.findViewById(R.id.selection_source)).setText(selected);
     ((TextView) view.findViewById(R.id.selection_notice))
-        .setText(
-            vm.demo
-                ? R.string.selection_mock_notice
-                : R.string.selection_online_notice);
+        .setText(vm.demo ? R.string.selection_mock_notice : R.string.selection_online_notice);
     Button retry = view.findViewById(R.id.selection_retry);
     vm.result.observe(
         getViewLifecycleOwner(),
@@ -151,10 +149,12 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     int width = Math.min(dp(340), Math.max(dp(120), screenWidth - dp(32)));
     window.setGravity(Gravity.TOP | Gravity.LEFT);
     window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT);
-    View toolbar = requireActivity().findViewById(R.id.toolbar);
+    View toolbar = requireActivity().findViewById(R.id.reader_toolbar);
     WindowManager.LayoutParams attrs = window.getAttributes();
     attrs.x = Math.max(0, (screenWidth - width) / 2);
-    attrs.y = (toolbar == null ? dp(56) : toolbar.getHeight()) + dp(8);
+    attrs.y =
+        (toolbar == null || toolbar.getVisibility() != View.VISIBLE ? 0 : toolbar.getHeight())
+            + dp(8);
     window.setAttributes(attrs);
     window.getDecorView().post(this::positionWindow);
   }
@@ -167,8 +167,10 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     if (height == 0) return;
     Rect frame = new Rect();
     requireActivity().getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
-    View toolbar = requireActivity().findViewById(R.id.toolbar);
-    int minY = (toolbar == null ? dp(56) : toolbar.getHeight()) + dp(8);
+    View toolbar = requireActivity().findViewById(R.id.reader_toolbar);
+    int minY =
+        (toolbar == null || toolbar.getVisibility() != View.VISIBLE ? 0 : toolbar.getHeight())
+            + dp(8);
     int maxY = Math.max(minY, frame.height() - height - dp(8));
     int top = requireArguments().getInt("anchorTop", -1) - frame.top;
     int bottom = requireArguments().getInt("anchorBottom", -1) - frame.top;
