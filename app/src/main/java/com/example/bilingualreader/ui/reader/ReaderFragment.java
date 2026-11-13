@@ -4,8 +4,6 @@ import android.os.Bundle;
 import android.view.*;
 import android.widget.*;
 import androidx.annotation.*;
-import androidx.core.view.MenuProvider;
-import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.*;
 import com.example.bilingualreader.R;
 import com.example.bilingualreader.contract.model.*;
@@ -24,6 +22,8 @@ public final class ReaderFragment extends BaseFragment {
   private int restoreOffset;
   private ReaderSettings lastSettings;
   private PopupMenu translationMenu;
+  private ReaderControls controls;
+  private ReaderSettings desiredSettings;
 
   public ReaderFragment() {
     super(R.layout.fragment_reader);
@@ -62,32 +62,63 @@ public final class ReaderFragment extends BaseFragment {
     adapter.setStateRestorationPolicy(RecyclerView.Adapter.StateRestorationPolicy.PREVENT);
     list.setLayoutManager(layout);
     list.setAdapter(adapter);
-    requireActivity()
-        .addMenuProvider(
-            new MenuProvider() {
+    controls = new ReaderControls(this, view);
+    ((TextView) view.findViewById(R.id.reader_book_name))
+        .setText(requireArguments().getString("title", "阅读"));
+    list.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> updateReadingInfo());
+    if (state != null && state.getBoolean("controlsVisible"))
+      view.post(
+          () -> {
+            if (controls != null) controls.show(state.getString("controlsPage", ""));
+          });
+    applyTypography();
+    GestureDetector taps =
+        new GestureDetector(
+            requireContext(),
+            new GestureDetector.SimpleOnGestureListener() {
               @Override
-              public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-                menu.add(0, R.id.reader_translation, 0, R.string.reader_translate_action)
-                    .setIcon(R.drawable.ic_translate)
-                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+              public boolean onDown(MotionEvent e) {
+                return true;
               }
 
               @Override
-              public boolean onMenuItemSelected(@NonNull MenuItem item) {
-                if (item.getItemId() != R.id.reader_translation) return false;
-                showTranslationActions();
-                return true;
+              public boolean onSingleTapConfirmed(MotionEvent e) {
+                if (list == null || !isResumed()) return false;
+                View focus = list.findFocus();
+                if (focus instanceof TextView && ((TextView) focus).hasSelection()) return false;
+                if (getChildFragmentManager().findFragmentByTag(SelectionTranslationSheet.TAG)
+                    != null) return false;
+                if (e.getX() > list.getWidth() * .2f
+                    && e.getX() < list.getWidth() * .8f
+                    && e.getY() > list.getHeight() * .2f
+                    && e.getY() < list.getHeight() * .8f) {
+                  controls.toggle();
+                  return true;
+                }
+                return false;
               }
-            },
-            getViewLifecycleOwner(),
-            Lifecycle.State.RESUMED);
+            });
+    list.addOnItemTouchListener(
+        new RecyclerView.SimpleOnItemTouchListener() {
+          @Override
+          public boolean onInterceptTouchEvent(@NonNull RecyclerView r, @NonNull MotionEvent e) {
+            taps.onTouchEvent(e);
+            return false;
+          }
+        });
     vm.command.observe(getViewLifecycleOwner(), command -> refreshTranslationMenu());
     list.setItemAnimator(null);
     list.addOnScrollListener(
         new RecyclerView.OnScrollListener() {
           @Override
+          public void onScrollStateChanged(@NonNull RecyclerView r, int state) {
+            if (state == RecyclerView.SCROLL_STATE_DRAGGING) controls.hide();
+          }
+
+          @Override
           public void onScrolled(@NonNull RecyclerView r, int dx, int dy) {
             if (!restoring && !restorePending) remember();
+            updateReadingInfo();
           }
         });
     vm.location.observe(
@@ -101,6 +132,7 @@ public final class ReaderFragment extends BaseFragment {
               .setVisibility(s.status == UiState.Status.ERROR ? View.VISIBLE : View.GONE);
           ((TextView) view.findViewById(R.id.error)).setText(s.message);
           updateChapterToolbar();
+          updateReadingInfo();
           refreshTranslationMenu();
           if (s.data != null) {
             androidx.fragment.app.Fragment lookup =
@@ -141,6 +173,7 @@ public final class ReaderFragment extends BaseFragment {
             view.findViewById(R.id.error)
                 .setVisibility(content.data.isEmpty() ? View.VISIBLE : View.GONE);
             restore();
+            list.post(this::updateReadingInfo);
           }
         });
     vm.settings.observe(
@@ -155,6 +188,7 @@ public final class ReaderFragment extends BaseFragment {
             restoreViewport = false;
           }
           lastSettings = s;
+          if (desiredSettings == null) desiredSettings = s;
           adapter.settings(s);
           restore();
         });
@@ -348,14 +382,12 @@ public final class ReaderFragment extends BaseFragment {
   }
 
   private void updateChapterToolbar() {
-    if (!isResumed()) return;
+    if (controls == null) return;
     UiState<ReaderViewModel.Location> state = vm.location.getValue();
-    host()
-        .page(
-            state != null && state.data != null
-                ? state.data.sectionTitle
-                : getString(R.string.reader_loading_title),
-            true);
+    controls.title(
+        state != null && state.data != null
+            ? state.data.sectionTitle
+            : getString(R.string.reader_loading_title));
   }
 
   private void restore() {
@@ -376,7 +408,31 @@ public final class ReaderFragment extends BaseFragment {
         && vm.getViewport(current.data.chapter.getChapterId()) != null)
       restoreOffset = vm.getViewportOffset(list.getWidth());
     layout.scrollToPositionWithOffset(adapter.indexOf(restoreId), restoreOffset);
-    list.post(() -> restoring = false);
+    list.post(
+        () -> {
+          restoring = false;
+          updateReadingInfo();
+        });
+  }
+
+  private void updateReadingInfo() {
+    if (list == null || getView() == null) return;
+    UiState<ReaderViewModel.Location> state = vm.location.getValue();
+    ((TextView) getView().findViewById(R.id.reader_footer_chapter))
+        .setText(state != null && state.data != null ? state.data.sectionTitle : "");
+    TextView progress = getView().findViewById(R.id.reader_footer_progress);
+    int first = layout.findFirstVisibleItemPosition();
+    View row = layout.findViewByPosition(first);
+    if (state == null || state.data == null || adapter.getItemCount() == 0 || row == null) {
+      progress.setText("—");
+      return;
+    }
+    double hidden =
+        (double) (list.getPaddingTop() - layout.getDecoratedTop(row))
+            / Math.max(1, layout.getDecoratedMeasuredHeight(row));
+    int percent = vm.readingPercent(first, hidden, !list.canScrollVertically(1));
+    progress.setText(percent + "%");
+    progress.setContentDescription("全书阅读进度 " + percent + "%");
   }
 
   private void remember() {
@@ -389,9 +445,22 @@ public final class ReaderFragment extends BaseFragment {
   }
 
   @Override
+  public void onSaveInstanceState(@NonNull Bundle state) {
+    super.onSaveInstanceState(state);
+    if (controls != null) {
+      state.putBoolean("controlsVisible", controls.isVisible());
+      state.putString("controlsPage", controls.page());
+    }
+  }
+
+  @Override
   public void onPause() {
     remember();
     if (vm != null) vm.flushProgress();
+    requireActivity().findViewById(R.id.toolbar).setVisibility(View.VISIBLE);
+    WindowManager.LayoutParams attrs = requireActivity().getWindow().getAttributes();
+    attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+    requireActivity().getWindow().setAttributes(attrs);
     super.onPause();
   }
 
@@ -401,14 +470,99 @@ public final class ReaderFragment extends BaseFragment {
       translationMenu.dismiss();
       translationMenu = null;
     }
+    controls = null;
     list = null;
     lastSettings = null;
+    desiredSettings = null;
     super.onDestroyView();
   }
 
   @Override
   public void onResume() {
     super.onResume();
+    requireActivity().findViewById(R.id.toolbar).setVisibility(View.GONE);
+    applyBrightness();
     updateChapterToolbar();
+  }
+
+  String bookId() {
+    return requireArguments().getString("book");
+  }
+
+  ReaderSettings readerSettings() {
+    return desiredSettings != null
+        ? desiredSettings
+        : lastSettings != null ? lastSettings : ReaderSettings.defaults();
+  }
+
+  void saveReaderSettings(Integer font, Float spacing, Boolean night) {
+    ReaderSettings old = readerSettings();
+    desiredSettings =
+        new ReaderSettings(
+            font == null ? old.getFontSizeSp() : font,
+            spacing == null ? old.getLineSpacingMultiplier() : spacing,
+            night == null ? old.getTheme() : night ? ReaderTheme.NIGHT : ReaderTheme.DAY);
+    ReaderSettings next = desiredSettings;
+    com.example.bilingualreader.contract.repository.SettingsRepository settingsRepository =
+        graph().settings;
+    graph()
+        .io
+        .execute(
+            () -> {
+              try {
+                settingsRepository.saveSettings(next);
+              } catch (AppException e) {
+                vm.command.postValue(UiState.error(e.getUserMessage()));
+              }
+            });
+  }
+
+  void applyTypography() {
+    if (list == null) return;
+    String anchor = adapter.idAt(layout.findFirstVisibleItemPosition());
+    android.content.SharedPreferences prefs = new ReaderLocalStore(requireContext()).preferences();
+    int margin =
+        Math.round(prefs.getInt("margin", 24) * getResources().getDisplayMetrics().density);
+    list.setPadding(margin, list.getPaddingTop(), margin, list.getPaddingBottom());
+    if (getView() != null)
+      for (int id : new int[] {R.id.reader_book_name, R.id.reader_footer}) {
+        View label = getView().findViewById(id);
+        label.setPadding(margin, label.getPaddingTop(), margin, label.getPaddingBottom());
+      }
+    adapter.bold(prefs.getBoolean("bold", false));
+    if (anchor != null) layout.scrollToPositionWithOffset(adapter.indexOf(anchor), 0);
+  }
+
+  void applyBrightness() {
+    android.content.SharedPreferences prefs = new ReaderLocalStore(requireContext()).preferences();
+    WindowManager.LayoutParams attrs = requireActivity().getWindow().getAttributes();
+    attrs.screenBrightness =
+        prefs.getBoolean("systemBrightness", true)
+            ? -1f
+            : Math.max(.05f, prefs.getInt("brightness", 50) / 100f);
+    requireActivity().getWindow().setAttributes(attrs);
+  }
+
+  ReaderLocalStore.Bookmark currentBookmark() {
+    UiState<ReaderViewModel.Location> state = vm.location.getValue();
+    int first = layout.findFirstVisibleItemPosition();
+    String paragraph = adapter.idAt(first);
+    if (state == null || state.data == null || paragraph == null) return null;
+    View row = layout.findViewByPosition(first);
+    TextView text = row == null ? null : row.findViewById(R.id.original);
+    String excerpt = text == null ? "" : text.getText().toString();
+    if (excerpt.length() > 90) excerpt = excerpt.substring(0, 90) + "…";
+    return new ReaderLocalStore.Bookmark(
+        state.data.chapter.getChapterId(),
+        paragraph,
+        state.data.sectionTitle,
+        excerpt,
+        row == null ? 0 : layout.getDecoratedTop(row) - list.getPaddingTop());
+  }
+
+  void jumpBookmark(ReaderLocalStore.Bookmark mark) {
+    remember();
+    if (!vm.jumpToBookmark(mark.chapter, mark.paragraph, mark.offset))
+      Toast.makeText(requireContext(), "书签对应章节已不存在", Toast.LENGTH_SHORT).show();
   }
 }

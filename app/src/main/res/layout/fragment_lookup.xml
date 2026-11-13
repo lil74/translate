@@ -1,0 +1,33 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background" android:paddingHorizontal="16dp">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingTop="12dp" android:paddingBottom="12dp">
+  <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:gravity="center_vertical" android:background="@drawable/lookup_search_field">
+   <ImageButton android:id="@+id/lookup_submit" android:layout_width="40dp" android:layout_height="48dp" android:padding="10dp" android:src="@drawable/ic_lookup_search" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="搜索"/>
+   <EditText android:id="@+id/lookup_input" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:background="@null" android:padding="0dp" android:textSize="16sp" android:singleLine="true" android:inputType="text" android:imeOptions="actionSearch" android:hint="输入中英文｜查词、翻译…"/>
+   <TextView android:id="@+id/lookup_clear" android:layout_width="36dp" android:layout_height="48dp" android:gravity="center" android:text="×" android:textSize="24sp" android:textColor="@color/muted" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:contentDescription="清空输入" android:visibility="gone"/>
+  </LinearLayout>
+  <TextView android:id="@+id/lookup_exit" android:layout_width="56dp" android:layout_height="48dp" android:gravity="end|center_vertical" android:text="取消" android:textSize="16sp" android:textColor="@color/ink" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true"/>
+ </LinearLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center" android:orientation="vertical">
+  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="通用搜索" android:textColor="@color/primary" android:textStyle="bold" android:textSize="17sp"/>
+  <View android:layout_width="24dp" android:layout_height="3dp" android:background="@color/primary" android:layout_marginTop="10dp"/>
+ </LinearLayout>
+ <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+   <ProgressBar android:id="@+id/lookup_loading" android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center" android:layout_marginTop="16dp" android:visibility="gone"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/lookup_cancel" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="停止查询" android:visibility="gone"/>
+   <LinearLayout android:id="@+id/lookup_output_panel" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="16dp" android:orientation="vertical" android:visibility="gone">
+    <TextView android:id="@+id/lookup_result_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" android:textColor="@color/muted"/>
+    <TextView android:id="@+id/lookup_result" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="16dp" android:textSize="21sp" android:lineSpacingMultiplier="1.4" android:textIsSelectable="true" android:accessibilityLiveRegion="polite"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end">
+     <com.google.android.material.button.MaterialButton android:id="@+id/lookup_retry" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="重试" android:visibility="gone"/>
+     <com.google.android.material.button.MaterialButton android:id="@+id/lookup_copy" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制"/>
+    </LinearLayout>
+   </LinearLayout>
+   <LinearLayout android:id="@+id/lookup_history_header" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:layout_marginTop="8dp">
+    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="搜索历史" android:textSize="14sp" android:textColor="@color/muted"/>
+    <ImageButton android:id="@+id/lookup_history_clear" android:layout_width="48dp" android:layout_height="48dp" android:padding="13dp" android:src="@drawable/ic_lookup_delete" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="清空搜索历史"/>
+   </LinearLayout>
+   <LinearLayout android:id="@+id/lookup_history" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+  </LinearLayout>
+ </ScrollView>
+</LinearLayout>

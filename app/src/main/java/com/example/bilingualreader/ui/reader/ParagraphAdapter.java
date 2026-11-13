@@ -14,6 +14,12 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
   private List<ParagraphItem> items = Collections.emptyList();
   private ReaderSettings settings = ReaderSettings.defaults();
   private boolean running;
+  private boolean bold;
+
+  public void bold(boolean value) {
+    bold = value;
+    notifyDataSetChanged();
+  }
 
   public interface OnSelectionTranslate {
     void translate(Paragraph paragraph, int start, int end, Rect screenBounds);
@@ -115,7 +121,8 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
     h.original.setTextSize(
         settings.getFontSizeSp() + (p.getBlockType() == BlockType.HEADING ? 4 : 0));
     h.original.setTypeface(
-        Typeface.SERIF, p.getBlockType() == BlockType.HEADING ? Typeface.BOLD : Typeface.NORMAL);
+        Typeface.SERIF,
+        p.getBlockType() == BlockType.HEADING || bold ? Typeface.BOLD : Typeface.NORMAL);
     h.original.setLineSpacing(0, settings.getLineSpacingMultiplier());
     h.translated.setTextSize(Math.max(14, settings.getFontSizeSp() - 2));
     h.translated.setLineSpacing(0, settings.getLineSpacingMultiplier());

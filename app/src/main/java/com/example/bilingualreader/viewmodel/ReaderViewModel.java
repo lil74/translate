@@ -171,6 +171,24 @@ public final class ReaderViewModel extends BaseViewModel {
       select(chapters.get(chapters.indexOf(location.getValue().data.chapter) + delta), null, 0);
   }
 
+  public int readingPercent(int paragraphIndex, double fraction, boolean chapterEnd) {
+    UiState<Location> current = location.getValue();
+    return current == null || current.data == null
+        ? 0
+        : ReaderProgress.percent(
+            chapters, current.data.chapter.getChapterId(), paragraphIndex, fraction, chapterEnd);
+  }
+
+  public boolean jumpToBookmark(String chapter, String paragraph, int offset) {
+    for (Chapter c : chapters)
+      if (c.getChapterId().equals(chapter)) {
+        viewport = null;
+        select(c, paragraph, offset);
+        return true;
+      }
+    return false;
+  }
+
   public void translate() {
     String id = chapterId.getValue();
     if (id != null)

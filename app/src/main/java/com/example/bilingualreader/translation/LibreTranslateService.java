@@ -56,17 +56,7 @@ public final class LibreTranslateService implements TranslationService {
         new TranslationBatchResult(request.getTaskId(), request.getRequestId(), outputs));
   }
 
-  private static final class ProviderText {
-    final String text,provider,version;
-    ProviderText(String text,String provider,String version){this.text=text;this.provider=provider;this.version=version;}
-  }
-  private String metadata(JsonObject response,String name,String fallback)throws AppException {
-    JsonElement value=response.get(name);if(value==null||value.isJsonNull())return fallback;
-    if(!value.isJsonPrimitive()||!value.getAsJsonPrimitive().isString()
-        ||TranslationValidation.isBlank(value.getAsString())||value.getAsString().length()>128)throw invalid();
-    return value.getAsString();
-  }
-  private ProviderText translateOne(String text) throws AppException {
+  private String translateOne(String text, String source, String target) throws AppException {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
@@ -81,8 +71,8 @@ public final class LibreTranslateService implements TranslationService {
       if (!accessToken.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + accessToken);
       JsonObject payload = new JsonObject();
       payload.addProperty("q", text);
-      payload.addProperty("source", "en");
-      payload.addProperty("target", "zh");
+      payload.addProperty("source", "zh-CN".equals(source) ? "zh" : source);
+      payload.addProperty("target", "zh-CN".equals(target) ? "zh" : target);
       payload.addProperty("format", "text");
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);

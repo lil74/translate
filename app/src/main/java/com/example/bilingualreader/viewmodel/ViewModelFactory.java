@@ -18,6 +18,7 @@ public final class ViewModelFactory implements ViewModelProvider.Factory {
     if (type == BookshelfViewModel.class) model = new BookshelfViewModel(graph);
     else if (type == TocViewModel.class) model = new TocViewModel(graph);
     else if (type == ReaderViewModel.class) model = new ReaderViewModel(graph);
+    else if (type == LookupViewModel.class) model = new LookupViewModel(graph);
     else if (type == SettingsViewModel.class) model = new SettingsViewModel(graph);
     else throw new IllegalArgumentException(type.getName());
     return type.cast(model);
