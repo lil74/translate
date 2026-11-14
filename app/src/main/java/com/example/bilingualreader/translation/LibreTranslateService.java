@@ -48,7 +48,7 @@ public final class LibreTranslateService implements TranslationService {
       if (cancelled || Thread.currentThread().isInterrupted()) {
         throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译验证已中断", false);
       }
-      ProviderText translated = translateOne(item.getText());
+      ProviderText translated = translateOne(item, request.getSourceLanguage(), request.getTargetLanguage());
       outputs.add(new TranslationOutput(item.getParagraphId(), item.getSourceHash(),
           TranslationStatus.SUCCESS, translated.text, translated.provider, translated.version, null));
     }
@@ -56,7 +56,17 @@ public final class LibreTranslateService implements TranslationService {
         new TranslationBatchResult(request.getTaskId(), request.getRequestId(), outputs));
   }
 
-  private String translateOne(String text, String source, String target) throws AppException {
+  private static final class ProviderText {
+    final String text,provider,version;
+    ProviderText(String text,String provider,String version){this.text=text;this.provider=provider;this.version=version;}
+  }
+  private String metadata(JsonObject response,String name,String fallback)throws AppException {
+    JsonElement value=response.get(name);if(value==null||value.isJsonNull())return fallback;
+    if(!value.isJsonPrimitive()||!value.getAsJsonPrimitive().isString()
+        ||TranslationValidation.isBlank(value.getAsString())||value.getAsString().length()>128)throw invalid();
+    return value.getAsString();
+  }
+  private ProviderText translateOne(TranslationInput item, String source, String target) throws AppException {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
@@ -70,10 +80,16 @@ public final class LibreTranslateService implements TranslationService {
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       if (!accessToken.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + accessToken);
       JsonObject payload = new JsonObject();
-      payload.addProperty("q", text);
+      payload.addProperty("q", item.getText());
       payload.addProperty("source", "zh-CN".equals(source) ? "zh" : source);
       payload.addProperty("target", "zh-CN".equals(target) ? "zh" : target);
       payload.addProperty("format", "text");
+      if(item.getContext()!=null) {
+        TranslationInput.Context context=item.getContext();
+        JsonObject sourceContext=new JsonObject();sourceContext.addProperty("text",context.getText());
+        sourceContext.addProperty("start",context.getStart());sourceContext.addProperty("end",context.getEnd());
+        payload.add("context",sourceContext);
+      }
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);
       try (OutputStream out = connection.getOutputStream()) { out.write(body); }
@@ -100,6 +116,12 @@ public final class LibreTranslateService implements TranslationService {
         }
       }
       JsonObject response = JsonParser.parseString(bytes.toString("UTF-8")).getAsJsonObject();
+      if(item.getContext()!=null) {
+        JsonElement contextual=response.get("contextual");
+        if(contextual==null || !contextual.isJsonPrimitive() || !contextual.getAsJsonPrimitive().isBoolean()
+            || !contextual.getAsBoolean())throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,
+                "当前翻译服务不支持段落语境，请在翻译服务设置中使用团队云端服务",false);
+      }
       JsonElement translated = response.get("translatedText");
       if (translated == null || !translated.isJsonPrimitive()
           || !translated.getAsJsonPrimitive().isString()

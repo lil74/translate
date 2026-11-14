@@ -14,8 +14,6 @@ public final class LookupViewModel extends ViewModel {
   public String input = "";
   public int direction = LookupQuery.AUTO;
   public Snapshot submitted;
-  public boolean cachedDemo;
-  public String recordedRequestId;
   private final AppContainer graph;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final Handler main = new Handler(Looper.getMainLooper());
@@ -30,10 +28,14 @@ public final class LookupViewModel extends ViewModel {
   public static final class Snapshot {
     public final TranslationBatchRequest request;
     public final AppContainer.SelectionBinding binding;
+    public final String endpoint;
+    private final long generation;
 
-    private Snapshot(TranslationBatchRequest request, AppContainer.SelectionBinding binding) {
+    private Snapshot(TranslationBatchRequest request, AppContainer.SelectionBinding binding, String endpoint, long generation) {
       this.request = request;
       this.binding = binding;
+      this.endpoint = endpoint;
+      this.generation = generation;
     }
 
     public String label() {
@@ -42,7 +44,8 @@ public final class LookupViewModel extends ViewModel {
   }
 
   public Snapshot prepare() throws AppException {
-    return new Snapshot(LookupQuery.request(input, direction), graph.selectionBinding());
+    return new Snapshot(LookupQuery.request(input, direction), graph.selectionBinding(),
+        graph.translationConfig == null ? "当前配置的在线翻译服务" : graph.translationConfig.endpoint(), generation);
   }
 
   public void invalidate() {
@@ -51,14 +54,13 @@ public final class LookupViewModel extends ViewModel {
     result.setValue(null);
   }
 
-  public void restoreCached(String query, String translated, boolean demo) {
-    invalidate();
-    input = query;
-    cachedDemo = demo;
-    result.setValue(UiState.success(translated));
+  public boolean isCurrent(Snapshot snapshot) {
+    return !cleared && snapshot.generation == generation
+        && snapshot.request.getItems().get(0).getText().equals(input);
   }
 
   public void translate(Snapshot snapshot) {
+    if (!isCurrent(snapshot)) return;
     cancel();
     final long token = generation;
     submitted = snapshot;

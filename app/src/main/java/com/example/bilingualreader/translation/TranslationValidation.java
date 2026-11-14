@@ -49,6 +49,17 @@ public final class TranslationValidation {
         throw invalid("原文、段落标识或原文哈希无效");
       }
       count += item.getText().codePointCount(0, item.getText().length());
+      TranslationInput.Context context=item.getContext();
+      if(context!=null) {
+        int length=context.getText().codePointCount(0,context.getText().length());
+        if(!forward || request.getItems().size()!=1 || !request.getTaskId().startsWith("selection:")
+            || length>SelectionContext.MAX_POINTS || context.getStart()<0
+            || context.getEnd()<=context.getStart() || context.getEnd()>length)
+          throw invalid("选词语境范围无效");
+        int lo=context.getText().offsetByCodePoints(0,context.getStart());
+        int hi=context.getText().offsetByCodePoints(0,context.getEnd());
+        if(!context.getText().substring(lo,hi).equals(item.getText()))throw invalid("语境与所选文字不一致");
+      }
     }
     if (count > 4000) throw invalid("第一阶段批次最多 4000 个 Unicode 码点，请先拆分长段落");
   }

@@ -76,6 +76,61 @@ class GatewayTest(unittest.TestCase):
         self.assertEqual(400, self.request(raw=b"{")[0])
         self.assertEqual([], self.calls)
 
+    def test_context_resolves_selected_occurrence_without_translating_full_paragraph(self):
+        passage="The bank approved the loan. He sat on the river bank."
+        start=passage.rindex("bank")
+        status,_,_=self.request({"q":"bank","source":"en","target":"zh",
+                                "context":{"text":passage,"start":start,"end":start+4}})
+        self.assertEqual(200,status)
+        self.assertEqual([{"role":"user","content":"bank"}],self.calls[0]["messages"])
+        domain=self.calls[0]["translation_options"]["domains"]
+        self.assertIn("river",domain)
+        self.assertIn('"selected": "bank"',domain)
+        self.assertIn("untrusted passage data",domain)
+
+    def test_context_unicode_offsets_and_invalid_ranges(self):
+        status,_,_=self.request({"q":"bank","source":"en","target":"zh",
+                                "context":{"text":"😀 bank","start":2,"end":6}})
+        self.assertEqual(200,status)
+        for context in ({"text":"bank","start":True,"end":4},
+                        {"text":"bank","start":0,"end":3},
+                        {"text":"bank","start":-1,"end":4},
+                        {"text":"x"*4001,"start":0,"end":4}):
+            self.assertEqual(400,self.request({"q":"bank","source":"en","target":"zh","context":context})[0])
+        self.assertEqual(1,len(self.calls))
+
+    def test_reverse_request_preserves_chinese_and_maps_both_languages(self):
+        text = " 你好，世界！\n今天读一本书。 "
+        for alias in ("zh", "zh-CN", "zh-Hans"):
+            status, body, _ = self.request({"q": text, "source": alias, "target": "en"})
+            self.assertEqual(200, status)
+            self.assertFalse(body["contextual"])
+            payload = self.calls[-1]
+            self.assertEqual(text, payload["messages"][0]["content"])
+            options = payload["translation_options"]
+            self.assertEqual("Chinese", options["source_lang"])
+            self.assertEqual("English", options["target_lang"])
+            self.assertIn("into natural English", options["domains"])
+            self.assertNotIn("into natural Simplified Chinese", options["domains"])
+
+    def test_same_language_unsupported_and_reverse_context_never_call_vendor(self):
+        for source, target in (("en", "en"), ("zh", "zh"), ("zh", "fr"), ("auto", "en")):
+            self.assertEqual(400, self.request({"q": "hello", "source": source, "target": target})[0])
+        self.assertEqual(400, self.request({"q": "你好", "source": "zh", "target": "en",
+            "context": {"text": "你好", "start": 0, "end": 2}})[0])
+        self.assertEqual([], self.calls)
+
+    def test_glossary_reverses_without_mutating_forward_configuration(self):
+        self.app = Gateway(Config("key", "a" * 32, "https://vendor.example/v1",
+                                  terms=({"source": "Alice", "target": "艾丽丝"},)),
+                           lambda config, payload: self.calls.append(payload) or "Alice")
+        self.request({"q": "艾丽丝", "source": "zh", "target": "en"})
+        self.assertEqual([{"source": "艾丽丝", "target": "Alice"}],
+                         self.calls[-1]["translation_options"]["terms"])
+        self.request({"q": "Alice", "source": "en", "target": "zh"})
+        self.assertEqual([{"source": "Alice", "target": "艾丽丝"}],
+                         self.calls[-1]["translation_options"]["terms"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,8 @@ import androidx.lifecycle.*;
 import com.example.bilingualreader.R;
 import com.example.bilingualreader.ReaderApplication;
 import com.example.bilingualreader.contract.model.Paragraph;
+import com.example.bilingualreader.contract.translation.TranslationInput;
+import com.example.bilingualreader.translation.SelectionContext;
 import com.example.bilingualreader.di.AppContainer;
 import com.example.bilingualreader.viewmodel.*;
 
@@ -25,6 +27,9 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
   private int windowX, windowY;
   private boolean moved;
   private boolean userPositioned;
+  private EnglishPronunciation pronunciation;
+  private boolean originKnown;
+  private int coordinateOriginX,coordinateOriginY;
 
   @Override
   public void onCreate(@Nullable Bundle state) {
@@ -46,6 +51,7 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
     window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
     window.setDimAmount(0f);
+    window.setWindowAnimations(0);
     window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
   }
 
@@ -56,6 +62,10 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     Bundle args = new Bundle();
     args.putString("selected", paragraph.getOriginalText().substring(start, end));
     args.putString("chapterId", paragraph.getChapterId());
+    if(paragraph.getOriginalText().codePointCount(start,end)<=SelectionContext.MAX_POINTS) {
+      TranslationInput.Context context=SelectionContext.fromParagraph(paragraph.getOriginalText(),start,end);
+      args.putString("contextText",context.getText());args.putInt("contextStart",context.getStart());args.putInt("contextEnd",context.getEnd());
+    }
     sheet.setArguments(args);
     return sheet;
   }
@@ -65,6 +75,8 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     SelectionTranslationSheet popup = create(paragraph, start, end);
     popup.requireArguments().putInt("anchorTop", bounds.top);
     popup.requireArguments().putInt("anchorBottom", bounds.bottom);
+    popup.requireArguments().putInt("anchorLeft",bounds.left);
+    popup.requireArguments().putInt("anchorRight",bounds.right);
     return popup;
   }
 
@@ -101,9 +113,37 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
                 })
             .get(SelectionTranslationViewModel.class);
     String selected = requireArguments().getString("selected", "");
+    TranslationInput.Context context=requireArguments().containsKey("contextText")
+        ?new TranslationInput.Context(requireArguments().getString("contextText"),
+            requireArguments().getInt("contextStart"),requireArguments().getInt("contextEnd")):null;
     ((TextView) view.findViewById(R.id.selection_source)).setText(selected);
+    ImageButton speak=view.findViewById(R.id.selection_pronounce);
+    TextView voiceStatus=view.findViewById(R.id.selection_voice_status);
+    View voiceSettings=view.findViewById(R.id.selection_voice_settings);
+    pronunciation=new EnglishPronunciation(requireContext(),voiceState->{
+      boolean playing=voiceState==EnglishPronunciation.State.SPEAKING;
+      speak.setImageResource(playing?R.drawable.ic_stop_pronounce:R.drawable.ic_pronounce);
+      speak.setContentDescription(getString(playing?R.string.selection_stop_pronounce:R.string.selection_pronounce));
+      int message=voiceState==EnglishPronunciation.State.PREPARING?R.string.selection_voice_preparing
+          :voiceState==EnglishPronunciation.State.UNAVAILABLE?R.string.selection_voice_missing
+          :voiceState==EnglishPronunciation.State.ERROR?R.string.selection_voice_error:0;
+      voiceStatus.setVisibility(message==0?View.GONE:View.VISIBLE);
+      if(message!=0)voiceStatus.setText(message);
+      voiceSettings.setVisibility(voiceState==EnglishPronunciation.State.UNAVAILABLE?View.VISIBLE:View.GONE);
+    });
+    speak.setOnClickListener(v->pronunciation.play(selected));
+    voiceSettings.setOnClickListener(v->{
+      android.content.Intent install=new android.content.Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+      String engine=pronunciation.enginePackage();if(engine!=null)install.setPackage(engine);
+      try {startActivity(install);}catch(android.content.ActivityNotFoundException unavailable) {
+        Toast.makeText(requireContext(),R.string.selection_voice_settings_missing,Toast.LENGTH_LONG).show();
+      }
+    });
     ((TextView) view.findViewById(R.id.selection_notice))
-        .setText(vm.demo ? R.string.selection_mock_notice : R.string.selection_online_notice);
+        .setText(
+            vm.demo
+                ? R.string.selection_mock_notice
+                : context==null ? R.string.selection_online_notice : R.string.selection_context_notice);
     Button retry = view.findViewById(R.id.selection_retry);
     vm.result.observe(
         getViewLifecycleOwner(),
@@ -119,7 +159,7 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
           retry.setVisibility(value.status == UiState.Status.ERROR ? View.VISIBLE : View.GONE);
           retry.setText(R.string.selection_retry);
         });
-    retry.setOnClickListener(v -> vm.translate(selected));
+    retry.setOnClickListener(v -> vm.translate(selected,context));
     view.findViewById(R.id.selection_close)
         .setOnClickListener(
             v -> {
@@ -127,11 +167,11 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
               dismiss();
             });
     if (vm.result.getValue() == null) {
-      if (vm.demo) vm.translate(selected);
+      if (vm.demo) vm.translate(selected,context);
       else {
         ((TextView) view.findViewById(R.id.selection_result))
-            .setText(R.string.selection_online_notice);
-        retry.setText(R.string.selection_confirm);
+            .setText(context==null?R.string.selection_online_notice:R.string.selection_context_consent);
+        retry.setText(context==null?R.string.selection_confirm:R.string.selection_context_confirm);
       }
     }
   }
@@ -139,6 +179,7 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
   @Override
   public void onStart() {
     super.onStart();
+    originKnown=false;
     Dialog dialog = getDialog();
     if (dialog == null || dialog.getWindow() == null) return;
     Window window = dialog.getWindow();
@@ -146,34 +187,42 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
     Rect frame = new Rect();
     requireActivity().getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
     int screenWidth = frame.width();
-    int width = Math.min(dp(340), Math.max(dp(120), screenWidth - dp(32)));
+    int width = Math.min(dp(300), Math.max(dp(120), screenWidth - dp(32)));
     window.setGravity(Gravity.TOP | Gravity.LEFT);
     window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT);
     View toolbar = requireActivity().findViewById(R.id.reader_toolbar);
     WindowManager.LayoutParams attrs = window.getAttributes();
-    attrs.x = Math.max(0, (screenWidth - width) / 2);
-    attrs.y =
-        (toolbar == null || toolbar.getVisibility() != View.VISIBLE ? 0 : toolbar.getHeight())
-            + dp(8);
+    attrs.x = 0;
+    attrs.y = (toolbar == null ? dp(56) : toolbar.getHeight()) + dp(8);
     window.setAttributes(attrs);
     window.getDecorView().post(this::positionWindow);
   }
 
   private void positionWindow() {
     Dialog dialog = getDialog();
-    if (userPositioned || dialog == null || dialog.getWindow() == null || !isAdded()) return;
+    if (dialog == null || dialog.getWindow() == null || !isAdded() || getView()==null) return;
     Window window = dialog.getWindow();
     int height = window.getDecorView().getHeight();
     if (height == 0) return;
     Rect frame = new Rect();
     requireActivity().getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
-    View toolbar = requireActivity().findViewById(R.id.reader_toolbar);
-    int minY =
-        (toolbar == null || toolbar.getVisibility() != View.VISIBLE ? 0 : toolbar.getHeight())
-            + dp(8);
-    int maxY = Math.max(minY, frame.height() - height - dp(8));
-    int top = requireArguments().getInt("anchorTop", -1) - frame.top;
-    int bottom = requireArguments().getInt("anchorBottom", -1) - frame.top;
+    View reading=requireActivity().findViewById(R.id.list);
+    Rect content=new Rect();
+    if(reading!=null && reading.getGlobalVisibleRect(content))frame.intersect(content);
+    frame.inset(dp(8),dp(8));
+    if(frame.width()<=0 || frame.height()<=0)return;
+    if(window.getDecorView().getWidth()>frame.width()) {
+      window.setLayout(frame.width(),WindowManager.LayoutParams.WRAP_CONTENT);return;
+    }
+    View scroll=requireView().findViewById(R.id.selection_scroll);
+    if(scroll instanceof SelectionResultScrollView) {
+      int fixedHeight=requireView().getHeight()-scroll.getHeight();
+      ((SelectionResultScrollView)scroll).setMaximumHeight(Math.max(dp(24),frame.height()-fixedHeight));
+    }
+    int top = requireArguments().getInt("anchorTop", -1);
+    int bottom = requireArguments().getInt("anchorBottom", -1);
+    int left=requireArguments().getInt("anchorLeft",frame.centerX()-1);
+    int right=requireArguments().getInt("anchorRight",frame.centerX()+1);
     if (requireArguments().getInt("anchorScreenWidth")
             != getResources().getDisplayMetrics().widthPixels
         || requireArguments().getInt("anchorScreenHeight")
@@ -181,16 +230,19 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
       top = -1;
       bottom = -1;
     }
-    int y = minY;
-    if (top >= 0 && bottom >= top) {
-      int above = top - height - dp(8), below = bottom + dp(8);
-      if (above >= minY) y = Math.min(above, maxY);
-      else if (below <= maxY) y = Math.max(minY, below);
-      else y = top > frame.height() / 2 ? minY : maxY;
-    }
     WindowManager.LayoutParams attrs = window.getAttributes();
-    if (attrs.y != y) {
-      attrs.y = y;
+    int[] actual=new int[2];window.getDecorView().getLocationOnScreen(actual);
+    if(!originKnown) {
+      coordinateOriginX=actual[0]-attrs.x;coordinateOriginY=actual[1]-attrs.y;originKnown=true;
+    }
+    int[] desired=userPositioned
+        ?new int[]{Math.max(frame.left,Math.min(actual[0],frame.right-window.getDecorView().getWidth())),
+            Math.max(frame.top,Math.min(actual[1],frame.bottom-height))}
+        :SelectionPopupPlacement.locate(frame.left,frame.top,frame.right,frame.bottom,left,top,right,bottom,
+            window.getDecorView().getWidth(),height,dp(8));
+    int x=desired[0]-coordinateOriginX,y=desired[1]-coordinateOriginY;
+    if (attrs.y != y || attrs.x!=x) {
+      attrs.y = y;attrs.x=x;
       window.setAttributes(attrs);
     }
   }
@@ -242,6 +294,18 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
               return false;
           }
         });
+  }
+
+  @Override
+  public void onStop() {
+    if(pronunciation!=null)pronunciation.stop();
+    super.onStop();
+  }
+
+  @Override
+  public void onDestroyView() {
+    if(pronunciation!=null){pronunciation.close();pronunciation=null;}
+    super.onDestroyView();
   }
 
   @Override

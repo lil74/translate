@@ -17,7 +17,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 public final class LookupFragment extends BaseFragment {
   private LookupViewModel vm;
   private EditText input;
-  private LookupHistory history;
+  private androidx.appcompat.app.AlertDialog confirmation;
 
   public LookupFragment() {
     super(R.layout.fragment_lookup);
@@ -29,8 +29,22 @@ public final class LookupFragment extends BaseFragment {
     vm = models().get(LookupViewModel.class);
     input = view.findViewById(R.id.lookup_input);
     input.setText(vm.input);
-    history = new LookupHistory(requireContext());
-    vm.direction = com.example.bilingualreader.translation.LookupQuery.AUTO;
+    // Discard history saved by older builds; this screen is memory-only.
+    requireContext().getSharedPreferences("lookup_history", Context.MODE_PRIVATE).edit().clear().apply();
+    Spinner direction = view.findViewById(R.id.lookup_direction);
+    direction.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item,
+        new String[] {"自动判断方向", "英文 → 中文", "中文 → 英文"}));
+    direction.setSelection(vm.direction);
+    direction.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+      @Override public void onItemSelected(AdapterView<?> parent, View row, int position, long id) {
+        if (vm.direction != position) {
+          vm.direction = position;
+          vm.invalidate();
+          dismissConfirmation();
+        }
+      }
+      @Override public void onNothingSelected(AdapterView<?> parent) {}
+    });
     input.addTextChangedListener(
         new TextWatcher() {
           public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -39,6 +53,7 @@ public final class LookupFragment extends BaseFragment {
             if (!vm.input.contentEquals(s)) {
               vm.input = s.toString();
               vm.invalidate();
+              dismissConfirmation();
             }
             input.setError(
                 s.toString().codePointCount(0, s.length()) > 4000 ? "最多 4000 个字符" : null);
@@ -58,16 +73,19 @@ public final class LookupFragment extends BaseFragment {
             });
     input.setOnEditorActionListener(
         (v, action, event) -> {
-          if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-              || (event != null
-                  && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
-                  && event.getAction() == KeyEvent.ACTION_DOWN)) {
+          if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
             submit();
             return true;
           }
           return false;
         });
     view.findViewById(R.id.lookup_submit).setOnClickListener(v -> submit());
+    view.findViewById(R.id.lookup_service).setVisibility(graph().translationConfig == null ? View.GONE : View.VISIBLE);
+    view.findViewById(R.id.lookup_service).setOnClickListener(v -> {
+      dismissConfirmation();
+      com.example.bilingualreader.ui.settings.TranslationSettingsDialog.show(
+          requireContext(), graph().translationConfig);
+    });
     view.findViewById(R.id.lookup_retry).setOnClickListener(v -> submit());
     view.findViewById(R.id.lookup_exit)
         .setOnClickListener(
@@ -76,12 +94,6 @@ public final class LookupFragment extends BaseFragment {
               requireActivity().getOnBackPressedDispatcher().onBackPressed();
             });
     view.findViewById(R.id.lookup_cancel).setOnClickListener(v -> vm.stop());
-    view.findViewById(R.id.lookup_history_clear)
-        .setOnClickListener(
-            v -> {
-              history.clear();
-              renderHistory(view);
-            });
     view.findViewById(R.id.lookup_copy)
         .setOnClickListener(
             v -> {
@@ -93,7 +105,6 @@ public final class LookupFragment extends BaseFragment {
                 Toast.makeText(requireContext(), "已复制", Toast.LENGTH_SHORT).show();
               }
             });
-    renderHistory(view);
     vm.result.observe(
         getViewLifecycleOwner(),
         value -> {
@@ -108,62 +119,18 @@ public final class LookupFragment extends BaseFragment {
           view.findViewById(R.id.lookup_retry).setVisibility(error ? View.VISIBLE : View.GONE);
           ((TextView) view.findViewById(R.id.lookup_result))
               .setText(value == null ? "" : success ? value.data : value.message);
-          boolean demo = vm.submitted == null ? vm.cachedDemo : vm.submitted.binding.demo;
+          boolean demo = vm.submitted != null && vm.submitted.binding.demo;
           TextView label = view.findViewById(R.id.lookup_result_label);
-          label.setText("模拟译文");
+          label.setText("模拟译文，非真实翻译");
           label.setVisibility(success && demo ? View.VISIBLE : View.GONE);
           view.findViewById(R.id.lookup_submit).setEnabled(!loading);
-          if (success
-              && vm.submitted != null
-              && !vm.submitted.request.getRequestId().equals(vm.recordedRequestId)) {
-            vm.recordedRequestId = vm.submitted.request.getRequestId();
-            history.record(vm.submitted.request.getItems().get(0).getText(), value.data, demo);
-            renderHistory(view);
-          }
         });
   }
 
-  private void renderHistory(View view) {
-    LinearLayout list = view.findViewById(R.id.lookup_history);
-    list.removeAllViews();
-    java.util.List<LookupHistory.Entry> rows = history.rows();
-    view.findViewById(R.id.lookup_history_clear).setEnabled(!rows.isEmpty());
-    view.findViewById(R.id.lookup_history_clear).setAlpha(rows.isEmpty() ? .35f : 1f);
-    for (LookupHistory.Entry entry : rows) {
-      LinearLayout row = new LinearLayout(requireContext());
-      row.setGravity(Gravity.CENTER_VERTICAL);
-      int height = Math.round(64 * getResources().getDisplayMetrics().density);
-      list.addView(row, new LinearLayout.LayoutParams(-1, height));
-      TextView word = new TextView(requireContext()), meaning = new TextView(requireContext());
-      word.setText(entry.query);
-      word.setTextSize(16);
-      word.setTypeface(null, android.graphics.Typeface.BOLD);
-      meaning.setText((entry.demo ? "模拟 · " : "") + entry.translated);
-      meaning.setTextSize(14);
-      meaning.setTextColor(
-          androidx.core.content.ContextCompat.getColor(
-              requireContext(), com.example.bilingualreader.R.color.muted));
-      for (TextView t : new TextView[] {word, meaning}) {
-        t.setSingleLine(true);
-        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-      }
-      word.setPadding(0, 0, Math.round(12 * getResources().getDisplayMetrics().density), 0);
-      row.addView(word, new LinearLayout.LayoutParams(0, -2, 1));
-      row.addView(meaning, new LinearLayout.LayoutParams(0, -2, 2));
-      android.util.TypedValue ripple = new android.util.TypedValue();
-      requireContext()
-          .getTheme()
-          .resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
-      row.setBackgroundResource(ripple.resourceId);
-      row.setFocusable(true);
-      row.setContentDescription(entry.query + "，" + (entry.demo ? "模拟译文，" : "") + entry.translated);
-      row.setOnClickListener(
-          v -> {
-            input.setText(entry.query);
-            input.setSelection(input.length());
-            vm.restoreCached(entry.query, entry.translated, entry.demo);
-            hideKeyboard();
-          });
+  private void dismissConfirmation() {
+    if (confirmation != null) {
+      confirmation.dismiss();
+      confirmation = null;
     }
   }
 
@@ -183,19 +150,17 @@ public final class LookupFragment extends BaseFragment {
           graph()
               .translationConfig
               .validate(graph().translationConfig.mode(), graph().translationConfig.endpoint());
-        String endpoint =
-            graph().translationConfig == null
-                ? "当前配置的在线翻译服务"
-                : graph().translationConfig.endpoint();
-        new MaterialAlertDialogBuilder(requireContext())
+        String endpoint = snapshot.endpoint;
+        dismissConfirmation();
+        confirmation = new MaterialAlertDialogBuilder(requireContext())
             .setTitle("发送输入内容用于翻译？")
             .setMessage(
-                "输入内容将发送到：\n" + endpoint + "\n\n方向：" + snapshot.label() + "。本次查询不会保存到书籍译文中。")
+                "输入内容将发送到：\n" + endpoint + "\n\n方向：" + snapshot.label() + "。本次输入和译文仅临时保留，不保存查询历史或书籍译文。")
             .setNegativeButton("取消", null)
             .setPositiveButton(
                 "同意并查询",
                 (d, w) -> {
-                  if (isAdded() && getView() != null) start(snapshot);
+                  if (isAdded() && getView() != null && vm.isCurrent(snapshot)) start(snapshot);
                 })
             .show();
       }
@@ -220,6 +185,7 @@ public final class LookupFragment extends BaseFragment {
 
   @Override
   public void onStop() {
+    dismissConfirmation();
     requireActivity().findViewById(R.id.toolbar).setVisibility(View.VISIBLE);
     if (!requireActivity().isChangingConfigurations()) vm.stop();
     super.onStop();
