@@ -1,6 +1,8 @@
 package com.example.bilingualreader.ui.reader;
 
 import android.graphics.Rect;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.view.*;
 import android.widget.TextView;
@@ -100,15 +102,14 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
               Rect bounds = new Rect();
               h.original.getGlobalVisibleRect(bounds);
               if (layout != null) {
+                Path path=new Path();layout.getSelectionPath(start,end,path);
+                RectF selectedBounds=new RectF();path.computeBounds(selectedBounds,true);
+                int textLeft=position[0]+h.original.getTotalPaddingLeft()-h.original.getScrollX();
                 int textTop =
                     position[1] + h.original.getTotalPaddingTop() - h.original.getScrollY();
-                bounds.top =
-                    Math.max(
-                        bounds.top, textTop + layout.getLineTop(layout.getLineForOffset(start)));
-                bounds.bottom =
-                    Math.min(
-                        bounds.bottom,
-                        textTop + layout.getLineBottom(layout.getLineForOffset(end - 1)));
+                Rect exact=new Rect(textLeft+(int)Math.floor(selectedBounds.left),textTop+(int)Math.floor(selectedBounds.top),
+                    textLeft+(int)Math.ceil(selectedBounds.right),textTop+(int)Math.ceil(selectedBounds.bottom));
+                if(!exact.isEmpty())bounds.intersect(exact);
               }
               selection.translate(p, start, end, bounds);
             }

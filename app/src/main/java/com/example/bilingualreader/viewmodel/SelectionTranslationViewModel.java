@@ -30,6 +30,9 @@ public final class SelectionTranslationViewModel extends ViewModel {
   }
 
   public void translate(String selected) {
+    translate(selected,null);
+  }
+  public void translate(String selected,TranslationInput.Context context) {
     cancel();
     long requestGeneration = generation;
     result.setValue(UiState.loading());
@@ -55,7 +58,7 @@ public final class SelectionTranslationViewModel extends ViewModel {
                         "zh-CN",
                         Collections.singletonList(
                             new TranslationInput(
-                                id, TranslationValidation.sha256(selected), selected)));
+                                id, TranslationValidation.sha256(selected), selected, context)));
                 TranslationBatchResult response =
                     TranslationValidation.validateResult(request, service.translate(request));
                 TranslationOutput output = response.getItems().get(0);

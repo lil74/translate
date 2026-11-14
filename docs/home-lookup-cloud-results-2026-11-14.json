@@ -1,0 +1,63 @@
+{
+  "date": "2026-11-14",
+  "endpoint": "https://8.148.28.233/translate",
+  "health": {
+    "status": "ok",
+    "model": "qwen-mt-plus",
+    "selectionContext": true,
+    "directions": [
+      "en:zh",
+      "zh:en"
+    ]
+  },
+  "samples": [
+    {
+      "input": "hello",
+      "source": "en",
+      "target": "zh",
+      "result": {
+        "translatedText": "你好",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false
+      },
+      "seconds": 0.484
+    },
+    {
+      "input": "你好",
+      "source": "zh",
+      "target": "en",
+      "result": {
+        "translatedText": "Hello",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false
+      },
+      "seconds": 0.516
+    },
+    {
+      "input": "今天下午我们去图书馆读书。",
+      "source": "zh",
+      "target": "en",
+      "result": {
+        "translatedText": "This afternoon, we went to the library to read.",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false
+      },
+      "seconds": 0.484
+    },
+    {
+      "input": "bank",
+      "source": "en",
+      "target": "zh",
+      "result": {
+        "translatedText": "河岸",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": true
+      },
+      "seconds": 0.407
+    }
+  ]
+}

@@ -1,40 +1,46 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:padding="14dp"
+    android:orientation="vertical" android:padding="12dp"
     android:background="@drawable/selection_floating_background">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/selection_drag" android:layout_width="0dp"
-            android:layout_weight="1" android:layout_height="48dp" android:gravity="center_vertical"
-            android:text="@string/selection_title" android:textSize="18sp" android:textStyle="bold"
-            android:textColor="@color/ink" android:contentDescription="@string/selection_drag_description"/>
+        android:minHeight="48dp" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/selection_drag" android:layout_width="match_parent"
+                android:layout_height="28dp" android:gravity="center_vertical"
+                android:text="@string/selection_context_title" android:textSize="12sp"
+                android:textColor="@color/muted" android:contentDescription="@string/selection_drag_description"/>
+            <TextView android:id="@+id/selection_source" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:textSize="18sp" android:textStyle="bold"
+                android:maxLines="3" android:ellipsize="end" android:textColor="@color/ink"
+                android:textIsSelectable="true"/>
+        </LinearLayout>
+        <ImageButton android:id="@+id/selection_pronounce" android:layout_width="48dp" android:layout_height="48dp"
+            android:src="@drawable/ic_pronounce" android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/selection_pronounce"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/selection_close"
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="48dp" android:layout_height="48dp" android:minWidth="48dp"
             android:padding="0dp" android:text="@string/selection_close_symbol" android:textSize="24sp"
             android:contentDescription="@string/selection_close"/>
     </LinearLayout>
-    <com.example.bilingualreader.ui.reader.SelectionResultScrollView
-        android:id="@+id/selection_scroll" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:fillViewport="false">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical">
-            <TextView android:id="@+id/selection_source" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:textSize="16sp" android:maxLines="3"
-                android:ellipsize="end" android:textColor="@color/ink" android:textIsSelectable="true"/>
-            <TextView android:id="@+id/selection_notice" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginVertical="8dp"
-                android:textSize="12sp" android:textColor="@color/muted"/>
-            <ProgressBar android:id="@+id/selection_spinner" android:layout_width="20dp"
-                android:layout_height="20dp" android:visibility="gone"/>
-            <TextView android:id="@+id/selection_result" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:textSize="16sp"
-                android:textColor="@color/translation" android:background="@drawable/soft_panel"
+    <com.example.bilingualreader.ui.reader.SelectionResultScrollView android:id="@+id/selection_scroll"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:fillViewport="false">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/selection_voice_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="12sp" android:textColor="@color/muted" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
+            <com.google.android.material.button.MaterialButton android:id="@+id/selection_voice_settings"
+                style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="@string/selection_voice_settings" android:visibility="gone"/>
+            <TextView android:id="@+id/selection_notice" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginVertical="6dp" android:textSize="12sp" android:textColor="@color/muted"/>
+            <ProgressBar android:id="@+id/selection_spinner" android:layout_width="20dp" android:layout_height="20dp" android:visibility="gone"/>
+            <TextView android:id="@+id/selection_result" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="16sp" android:textColor="@color/translation" android:background="@drawable/soft_panel"
                 android:textIsSelectable="true" android:accessibilityLiveRegion="polite"/>
-            <com.google.android.material.button.MaterialButton android:id="@+id/selection_retry"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_gravity="end" android:layout_marginTop="8dp"
-                android:text="@string/selection_retry"/>
         </LinearLayout>
     </com.example.bilingualreader.ui.reader.SelectionResultScrollView>
+    <com.google.android.material.button.MaterialButton android:id="@+id/selection_retry"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="end"
+        android:layout_marginTop="6dp" android:text="@string/selection_retry"/>
 </LinearLayout>
