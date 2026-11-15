@@ -1,0 +1,83 @@
+{
+  "date": "2026-11-15",
+  "endpoint": "https://8.148.28.233/translate",
+  "health": {
+    "status": "ok",
+    "model": "qwen-mt-plus",
+    "selectionContext": true,
+    "subtitleProfile": true,
+    "directions": [
+      "en:zh",
+      "zh:en"
+    ]
+  },
+  "samples": [
+    {
+      "request": {
+        "q": "Let's go. We're running late.",
+        "source": "en",
+        "target": "zh",
+        "profile": "subtitle"
+      },
+      "response": {
+        "translatedText": "走吧。我们迟到了。",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false,
+        "subtitle": true
+      },
+      "seconds": 0.453
+    },
+    {
+      "request": {
+        "q": "我们开始吧，下一句请跟我读。",
+        "source": "zh",
+        "target": "en",
+        "profile": "subtitle"
+      },
+      "response": {
+        "translatedText": "Let’s begin. Please repeat after me for the next sentence.",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false,
+        "subtitle": true
+      },
+      "seconds": 0.532
+    },
+    {
+      "request": {
+        "q": "hello",
+        "source": "en",
+        "target": "zh"
+      },
+      "response": {
+        "translatedText": "你好",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": false,
+        "subtitle": false
+      },
+      "seconds": 0.453
+    },
+    {
+      "request": {
+        "q": "bank",
+        "source": "en",
+        "target": "zh",
+        "context": {
+          "text": "She sat on the river bank.",
+          "start": 21,
+          "end": 25
+        }
+      },
+      "response": {
+        "translatedText": "河岸",
+        "provider": "qwen-mt",
+        "engineVersion": "qwen-mt-plus",
+        "contextual": true,
+        "subtitle": false
+      },
+      "seconds": 0.437
+    }
+  ]
+}

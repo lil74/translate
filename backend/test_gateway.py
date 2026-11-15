@@ -131,6 +131,23 @@ class GatewayTest(unittest.TestCase):
         self.assertEqual([{"source": "Alice", "target": "艾丽丝"}],
                          self.calls[-1]["translation_options"]["terms"])
 
+    def test_subtitle_profile_is_directional_and_does_not_modify_novel_defaults(self):
+        for source, target, name in (("en", "zh", "Simplified Chinese"), ("zh", "en", "English")):
+            status, body, _ = self.request({"q": "Hello", "source": source, "target": target, "profile": "subtitle"})
+            self.assertEqual(200, status)
+            self.assertTrue(body["subtitle"])
+            domains = self.calls[-1]["translation_options"]["domains"]
+            self.assertIn("concise spoken language", domains)
+            self.assertIn(name, domains)
+        _, body, _ = self.request()
+        self.assertFalse(body["subtitle"])
+        self.assertEqual(self.config.domains, self.calls[-1]["translation_options"]["domains"])
+
+    def test_invalid_profile_or_mixed_context_never_calls_vendor(self):
+        for extra in ({"profile": "other"}, {"profile": "subtitle", "context": {"text": "bank", "start": 0, "end": 4}}):
+            self.assertEqual(400, self.request(dict(q="bank", source="en", target="zh", **extra))[0])
+        self.assertEqual([], self.calls)
+
 
 if __name__ == "__main__":
     unittest.main()
