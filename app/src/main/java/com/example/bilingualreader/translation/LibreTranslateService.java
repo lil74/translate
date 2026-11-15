@@ -48,7 +48,7 @@ public final class LibreTranslateService implements TranslationService {
       if (cancelled || Thread.currentThread().isInterrupted()) {
         throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译验证已中断", false);
       }
-      ProviderText translated = translateOne(item, request.getSourceLanguage(), request.getTargetLanguage());
+      ProviderText translated = translateOne(item, request.getSourceLanguage(), request.getTargetLanguage(), request.getPurpose());
       outputs.add(new TranslationOutput(item.getParagraphId(), item.getSourceHash(),
           TranslationStatus.SUCCESS, translated.text, translated.provider, translated.version, null));
     }
@@ -66,7 +66,7 @@ public final class LibreTranslateService implements TranslationService {
         ||TranslationValidation.isBlank(value.getAsString())||value.getAsString().length()>128)throw invalid();
     return value.getAsString();
   }
-  private ProviderText translateOne(TranslationInput item, String source, String target) throws AppException {
+  private ProviderText translateOne(TranslationInput item, String source, String target, TranslationBatchRequest.Purpose purpose) throws AppException {
     HttpURLConnection connection = null;
     try {
       connection = (HttpURLConnection) endpoint.openConnection();
@@ -84,6 +84,7 @@ public final class LibreTranslateService implements TranslationService {
       payload.addProperty("source", "zh-CN".equals(source) ? "zh" : source);
       payload.addProperty("target", "zh-CN".equals(target) ? "zh" : target);
       payload.addProperty("format", "text");
+      if (purpose == TranslationBatchRequest.Purpose.SUBTITLE) payload.addProperty("profile", "subtitle");
       if(item.getContext()!=null) {
         TranslationInput.Context context=item.getContext();
         JsonObject sourceContext=new JsonObject();sourceContext.addProperty("text",context.getText());
@@ -116,6 +117,12 @@ public final class LibreTranslateService implements TranslationService {
         }
       }
       JsonObject response = JsonParser.parseString(bytes.toString("UTF-8")).getAsJsonObject();
+      if(purpose == TranslationBatchRequest.Purpose.SUBTITLE) {
+        JsonElement subtitle=response.get("subtitle");
+        if(subtitle==null || !subtitle.isJsonPrimitive() || !subtitle.getAsJsonPrimitive().isBoolean()
+            || !subtitle.getAsBoolean())throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,
+                "当前服务尚未支持视频字幕翻译，请使用更新后的团队云端网关",false);
+      }
       if(item.getContext()!=null) {
         JsonElement contextual=response.get("contextual");
         if(contextual==null || !contextual.isJsonPrimitive() || !contextual.getAsJsonPrimitive().isBoolean()

@@ -4,6 +4,8 @@ import com.example.bilingualreader.contract.model.*;
 import java.util.*;
 
 public final class TranslationBatchRequest {
+  public enum Purpose { GENERAL, SUBTITLE }
+  private final Purpose purpose;
   private final String taskId;
   private final String requestId;
   private final String sourceLanguage;
@@ -16,6 +18,12 @@ public final class TranslationBatchRequest {
       String sourceLanguage,
       String targetLanguage,
       List<TranslationInput> items) {
+    this(taskId, requestId, sourceLanguage, targetLanguage, items, Purpose.GENERAL);
+  }
+
+  public TranslationBatchRequest(String taskId, String requestId, String sourceLanguage,
+      String targetLanguage, List<TranslationInput> items, Purpose purpose) {
+    this.purpose = Objects.requireNonNull(purpose);
     this.taskId = Objects.requireNonNull(taskId);
     this.requestId = Objects.requireNonNull(requestId);
     this.sourceLanguage = Objects.requireNonNull(sourceLanguage);
@@ -26,6 +34,8 @@ public final class TranslationBatchRequest {
   public String getTaskId() {
     return taskId;
   }
+
+  public Purpose getPurpose() { return purpose == null ? Purpose.GENERAL : purpose; }
 
   public String getRequestId() {
     return requestId;

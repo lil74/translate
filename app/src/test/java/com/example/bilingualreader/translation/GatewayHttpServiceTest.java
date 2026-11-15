@@ -54,6 +54,22 @@ public class GatewayHttpServiceTest {
     TranslationOutput output=new LibreTranslateService(endpoint).translate(request()).getItems().get(0);
     assertNull(authorization.get());assertEquals("libretranslate",output.getProvider());assertNull(output.getEngineVersion());
   }
+  @Test public void subtitlePurposeUsesSameRouteAndRequiresCapabilityAcknowledgement()throws Exception {
+    response.set("{\"translatedText\":\"你好\",\"provider\":\"qwen-mt\",\"subtitle\":true}");
+    TranslationBatchRequest original=request();
+    TranslationBatchRequest subtitle=new TranslationBatchRequest(original.getTaskId(),original.getRequestId(),
+        "en","zh-CN",original.getItems(),TranslationBatchRequest.Purpose.SUBTITLE);
+    assertEquals("你好",new LibreTranslateService(endpoint).translate(subtitle).getItems().get(0).getTranslatedText());
+    assertTrue(requestBody.get().contains("\"profile\":\"subtitle\""));
+    assertFalse(requestBody.get().contains("context"));
+  }
+  @Test public void legacyServerCannotSilentlyIgnoreSubtitlePurpose()throws Exception {
+    TranslationBatchRequest original=request();
+    TranslationBatchRequest subtitle=new TranslationBatchRequest(original.getTaskId(),original.getRequestId(),
+        "en","zh-CN",original.getItems(),TranslationBatchRequest.Purpose.SUBTITLE);
+    try {new LibreTranslateService(endpoint).translate(subtitle);fail();}
+    catch(AppException expected){assertEquals(ErrorCode.UNSUPPORTED_CONTENT,expected.getCode());}
+  }
   @Test public void malformedProviderMetadataCannotBeStoredAsSuccess()throws Exception {
     response.set("{\"translatedText\":\"你好\",\"provider\":123}");
     try {new LibreTranslateService(endpoint,"team-test-token").translate(request());fail();}

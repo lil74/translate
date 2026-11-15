@@ -80,6 +80,10 @@ public final class MainActivity extends AppCompatActivity {
     push(new com.example.bilingualreader.ui.lookup.LookupFragment());
   }
 
+  public void openVideo() {
+    push(new com.example.bilingualreader.ui.video.VideoFragment());
+  }
+
   public void openToc(String book, String title) {
     push(TocFragment.create(book, title));
   }

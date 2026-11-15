@@ -42,6 +42,7 @@ public final class BookshelfFragment extends BaseFragment {
     vm = models().get(BookshelfViewModel.class);
     commands(vm);
     view.findViewById(R.id.open_lookup).setOnClickListener(v -> host().openLookup());
+    view.findViewById(R.id.open_video).setOnClickListener(v -> host().openVideo());
     ((TextView) view.findViewById(R.id.mode_banner))
         .setText("导入 EPUB/TXT 开始阅读 · 翻译本章可生成逐段译文\n"
             + (graph().demo || graph().translationConfig != null
