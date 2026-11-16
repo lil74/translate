@@ -30,6 +30,9 @@ public final class VideoViewModel extends ViewModel {
   private boolean initialized;
   private long revision;
   public boolean busy=true, translating;
+  public boolean recognizingSpeech;
+  public boolean fullScreen,resumePlayback;
+  public float playbackSpeed=1f;
   public String message="正在恢复上次的视频项目…";
   private final Runnable saveLater=this::persist;
 
@@ -97,7 +100,13 @@ public final class VideoViewModel extends ViewModel {
       }); }
     });
   }
-  public void recognize(float top,float bottom) {
+  public void recognize(float top,float bottom) { recognize(top,bottom,null); }
+  public Prepared prepareEnglishOcr() throws AppException {
+    Prepared current=prepare();
+    return new Prepared(current.binding,current.endpoint,"en","zh-CN",generation,false);
+  }
+  public void recognize(float top,float bottom,Prepared translation) {
+    if(translation!=null && translation.generation!=generation)return;
     if(busy || project.videoUri==null)return;
     cancel();long token=generation;String uri=project.videoUri;
     busy=true;message="正在本机识别英文画面…";publish();
@@ -109,6 +118,7 @@ public final class VideoViewModel extends ViewModel {
         main.post(()->{if(cleared || token!=generation)return;
           project=new VideoProject(project.videoUri,project.videoName,"画面英文 OCR",0,null,false,project.positionMs,cues);
           busy=false;message="识别完成，共 "+cues.size()+" 条。请预览并修正，再点击翻译。时间轴精度约 0.5 秒。";changed();
+          if(translation!=null)translate(new Prepared(translation.binding,translation.endpoint,"en","zh-CN",generation,false));
         });
       }catch(Exception error){main.post(()->{if(cleared || token!=generation)return;
         busy=false;message=error instanceof IllegalArgumentException?error.getMessage():"画面识别失败，请检查视频格式或重新尝试";publish();
@@ -121,6 +131,40 @@ public final class VideoViewModel extends ViewModel {
     for(SubtitleSegment cue:project.cues)cues.add(cue.clearTranslation());
     project=new VideoProject(project.videoUri,project.videoName,project.subtitleName,direction,null,false,project.positionMs,cues);
     message="方向已改变，旧译文已清除"; changed();
+  }
+  public static final class SpeechPrepared {
+    public final Prepared translation;
+    private final SpeechClient client;
+    SpeechPrepared(Prepared translation,SpeechClient client){this.translation=translation;this.client=client;}
+  }
+  public SpeechPrepared prepareSpeech() throws Exception {
+    Prepared translation=prepareEnglishOcr();
+    if(translation.binding.demo || graph.translationConfig==null)
+      throw new IllegalArgumentException("语音识别需要真实云端服务，请先关闭模拟模式并配置访问令牌");
+    return new SpeechPrepared(translation,new SpeechClient(context,translation.endpoint,
+        graph.translationConfig.tokenForEndpoint(translation.endpoint)));
+  }
+  public void recognizeSpeech(SpeechPrepared prepared) {
+    if(cleared || busy || project.videoUri==null || prepared.translation.generation!=generation)return;
+    cancel();long token=generation;Uri video=Uri.parse(project.videoUri);
+    busy=true;recognizingSpeech=true;message="正在准备视频音频…";publish();
+    pending=network.submit(()->{
+      try{
+        List<SubtitleSegment> cues=prepared.client.recognize(video,status->main.post(()->{
+          if(!cleared && token==generation){message=status;publish();}
+        }));
+        main.post(()->{if(cleared || token!=generation)return;
+          project=new VideoProject(project.videoUri,project.videoName,"语音识别 ASR",0,null,false,project.positionMs,cues);
+          busy=false;recognizingSpeech=false;message="语音识别完成，正在进入翻译…";changed();
+          Prepared translation=prepared.translation;
+          translate(new Prepared(translation.binding,translation.endpoint,"en","zh-CN",generation,false));
+        });
+      }catch(Exception error){main.post(()->{if(cleared || token!=generation)return;
+        busy=false;recognizingSpeech=false;
+        message=error instanceof IllegalArgumentException || error instanceof IOException?error.getMessage():"语音识别失败，请检查音轨、网络及云端配置后继续";
+        publish();
+      });}
+    });
   }
   public void edit(String id, String text) {
     if(text==null || text.trim().isEmpty() || text.codePointCount(0,text.length())>40000) {
@@ -181,7 +225,8 @@ public final class VideoViewModel extends ViewModel {
   public void cancel() {
     if(!initialized)return;
     generation++; if(pending!=null){pending.cancel(true);pending=null;}
-    if(busy){busy=false;translating=false;message="处理已取消，已完成字幕保留";publish();}
+    if(busy){busy=false;translating=false;message=recognizingSpeech
+        ?"已暂停等待，云端语音任务可能仍在运行；点击语音识别可继续获取结果":"处理已取消，已完成字幕保留";recognizingSpeech=false;publish();}
   }
   public void export(Uri destination, boolean vtt, boolean bilingual) {
     final String text;

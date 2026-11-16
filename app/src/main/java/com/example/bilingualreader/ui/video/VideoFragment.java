@@ -33,6 +33,12 @@ public final class VideoFragment extends BaseFragment {
   private CueAdapter adapter;
   private String loadedUri;
   private long replayEnd=-1;
+  private FrameLayout stage,fullscreenOverlay;
+  private ViewGroup stageParent;
+  private ViewGroup.LayoutParams stageParams;
+  private int stageIndex;
+  private androidx.activity.OnBackPressedCallback fullscreenBack;
+
   private final Handler main=new Handler(Looper.getMainLooper());
   private androidx.appcompat.app.AlertDialog dialog;
   private boolean exportVtt, exportBilingual=true;
@@ -79,16 +85,8 @@ public final class VideoFragment extends BaseFragment {
     view.findViewById(R.id.video_pick).setOnClickListener(v -> videoPicker.launch(new String[]{"video/*"}));
     view.findViewById(R.id.video_subtitle_pick).setOnClickListener(v -> subtitlePicker.launch(new String[]{"*/*"}));
     view.findViewById(R.id.video_cancel).setOnClickListener(v -> {closeDialog();vm.cancel();});
-    view.findViewById(R.id.video_ocr).setOnClickListener(v -> {
-      if(player!=null)player.pause();closeDialog();
-      String[] regions={"底部字幕区域（下方 35%）","中下部（下方 60%）","整个画面（可能包含水印、标题）"};
-      dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("选择英文识别区域")
-          .setMessage("识别完成后请核对原文。已有字幕和译文会被替换；可先取消并导出。")
-          .setPositiveButton("选择区域",(d,w)->{
-            dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("英文文字出现在哪里？")
-                .setItems(regions,(next,index)->vm.recognize(index==0?.65f:index==1?.4f:0f,1f)).show();
-          }).setNegativeButton("取消",null).show();
-    });
+    view.findViewById(R.id.video_ocr).setOnClickListener(v -> chooseOcr());
+    view.findViewById(R.id.video_asr).setOnClickListener(v -> chooseSpeech());
     view.findViewById(R.id.video_translate).setOnClickListener(v -> confirmTranslation());
     view.findViewById(R.id.video_export).setOnClickListener(v -> chooseExport());
     view.findViewById(R.id.video_service).setVisibility(graph().translationConfig==null?View.GONE:View.VISIBLE);
@@ -101,13 +99,21 @@ public final class VideoFragment extends BaseFragment {
         if(!vm.busy && position!=vm.project().direction){closeDialog();vm.direction(position);}
       }
     });
-    Spinner speed=view.findViewById(R.id.video_speed);
-    speed.setAdapter(new ArrayAdapter<>(requireContext(),android.R.layout.simple_spinner_dropdown_item,new String[]{"0.75 倍速","1.0 倍速","1.25 倍速","1.5 倍速","2.0 倍速"}));
-    speed.setSelection(1);
-    speed.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
-      public void onNothingSelected(AdapterView<?> p){}
-      public void onItemSelected(AdapterView<?> p,View row,int position,long id){if(player!=null)player.setPlaybackSpeed(speeds[position]);}
+    stage=view.findViewById(R.id.video_stage);stageParent=(ViewGroup)stage.getParent();
+    stageParams=stage.getLayoutParams();stageIndex=stageParent.indexOfChild(stage);
+    TextView speed=view.findViewById(R.id.video_speed);speed.setText(String.format(java.util.Locale.ROOT,"%.2g×",vm.playbackSpeed));
+    speed.setOnClickListener(v->{
+      closeDialog();dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("播放速度")
+          .setItems(new String[]{"0.75×","1.0×","1.25×","1.5×","2.0×"},(d,index)->{
+            vm.playbackSpeed=speeds[index];speed.setText(String.format(java.util.Locale.ROOT,"%.2g×",vm.playbackSpeed));
+            if(player!=null)player.setPlaybackSpeed(vm.playbackSpeed);
+          }).show();
     });
+    view.findViewById(R.id.video_fullscreen).setOnClickListener(v->setFullscreen(!vm.fullScreen,true));
+    fullscreenBack=new androidx.activity.OnBackPressedCallback(vm.fullScreen){
+      @Override public void handleOnBackPressed(){setFullscreen(false,true);}
+    };
+    requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),fullscreenBack);
     vm.changes.observe(getViewLifecycleOwner(),ignored -> render());
   }
   private void render(){
@@ -119,10 +125,12 @@ public final class VideoFragment extends BaseFragment {
     view.findViewById(R.id.video_direction).setEnabled(!vm.busy);
     view.findViewById(R.id.video_pick).setEnabled(!vm.busy);
     view.findViewById(R.id.video_ocr).setEnabled(!vm.busy && p.videoUri!=null);
+    view.findViewById(R.id.video_asr).setEnabled(!vm.busy && p.videoUri!=null);
     view.findViewById(R.id.video_subtitle_pick).setEnabled(!vm.busy);
     view.findViewById(R.id.video_translate).setEnabled(!vm.busy && !p.cues.isEmpty());
     ((TextView)view.findViewById(R.id.video_translate)).setText(!p.cues.isEmpty() && p.translatedCount()==p.cues.size()?"重新翻译全部":"翻译 / 继续翻译");
     view.findViewById(R.id.video_cancel).setVisibility(vm.busy?View.VISIBLE:View.GONE);
+    ((TextView)view.findViewById(R.id.video_cancel)).setText(vm.recognizingSpeech?"暂停等待":"取消处理");
     view.findViewById(R.id.video_export).setEnabled(!vm.busy && !p.cues.isEmpty() && p.translatedCount()==p.cues.size());
     view.findViewById(R.id.video_demo).setVisibility(p.demo && p.translatedCount()>0?View.VISIBLE:View.GONE);
     ProgressBar progress=view.findViewById(R.id.video_progress);
@@ -130,6 +138,34 @@ public final class VideoFragment extends BaseFragment {
     progress.setProgress(p.cues.isEmpty()?0:p.translatedCount()*1000/p.cues.size());
     if(adapter.items!=p.cues){adapter.items=p.cues;adapter.notifyDataSetChanged();}
     ensureMedia();tickCaptions();
+  }
+  private void chooseOcr(){
+    if(player!=null)player.pause();closeDialog();
+    String[] regions={"底部字幕区域（下方 35%）","中下部（下方 60%）","整个画面（可能包含水印、标题）"};
+    dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("识别并翻译：选择英文区域")
+        .setItems(regions,(d,index)->{
+          try{
+            VideoViewModel.Prepared prepared=vm.prepareEnglishOcr();
+            float top=index==0?.65f:index==1?.4f:0f;
+            dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("识别画面英文并翻译成中文？")
+                .setMessage("识别在本机进行，成功后自动翻译。将替换现有字幕和译文。\n"
+                    +(prepared.binding.demo?"当前为模拟模式，只生成明确标记的模拟译文。":"识别文字将发送到："+prepared.endpoint+"。视频不会上传。"))
+                .setNegativeButton("取消",null).setPositiveButton("开始",(confirm,w)->vm.recognize(top,1f,prepared)).show();
+          }catch(com.example.bilingualreader.contract.model.AppException error){notice(error.getUserMessage());}
+        }).show();
+  }
+  private void chooseSpeech(){
+    if(player!=null)player.pause();closeDialog();
+    try{
+      VideoViewModel.SpeechPrepared prepared=vm.prepareSpeech();
+      dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("上传音频并识别英文语音？")
+          .setMessage("会从视频提取 AAC 音频，发送到 "+prepared.translation.endpoint
+              +" 对应的团队服务器，并交给阿里云百炼识别，再自动翻译成中文。视频画面不上传。"
+              +"语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。成功后会替换当前字幕和译文。"
+              +"暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
+          .setNegativeButton("取消",null).setPositiveButton("同意并开始",(d,w)->vm.recognizeSpeech(prepared)).show();
+    }catch(Exception error){notice(error instanceof com.example.bilingualreader.contract.model.AppException
+        ?((com.example.bilingualreader.contract.model.AppException)error).getUserMessage():error.getMessage());}
   }
   private void confirmTranslation(){
     try {
@@ -201,18 +237,43 @@ public final class VideoFragment extends BaseFragment {
         status.setText("视频无法播放：请检查文件授权或改用设备支持的 MP4/H.264 视频，重新选择视频可重试。");status.setVisibility(View.VISIBLE);
       }}
     });
-    Spinner speed=requireView().findViewById(R.id.video_speed);player.setPlaybackSpeed(speeds[speed.getSelectedItemPosition()]);
-    loadedUri=null;ensureMedia();main.post(ticker);
+    player.setPlaybackSpeed(vm.playbackSpeed);
+    loadedUri=null;ensureMedia();player.setPlayWhenReady(vm.resumePlayback);setFullscreen(vm.fullScreen,false);main.post(ticker);
   }
   @Override public void onStop(){
     closeDialog();main.removeCallbacks(ticker);
-    if(player!=null){vm.checkpoint(player.getCurrentPosition());playerView.setPlayer(null);player.release();player=null;}
+    if(player!=null){vm.resumePlayback=player.getPlayWhenReady();vm.checkpoint(player.getCurrentPosition());playerView.setPlayer(null);player.release();player=null;}
     if(!requireActivity().isChangingConfigurations())vm.cancel();
     super.onStop();
   }
   @Override public void onSaveInstanceState(@NonNull Bundle state){super.onSaveInstanceState(state);state.putBoolean("vtt",exportVtt);state.putBoolean("bilingual",exportBilingual);}
   private void closeDialog(){if(dialog!=null){dialog.dismiss();dialog=null;}}
-  @Override public void onDestroyView(){closeDialog();caption=null;playerView=null;adapter=null;super.onDestroyView();}
+  private void setFullscreen(boolean enabled,boolean rotate){
+    if(enabled && fullscreenOverlay==null){
+      stageParent.removeView(stage);
+      fullscreenOverlay=new FrameLayout(requireContext());fullscreenOverlay.setBackgroundColor(android.graphics.Color.BLACK);
+      ((ViewGroup)requireActivity().findViewById(android.R.id.content)).addView(fullscreenOverlay,new ViewGroup.LayoutParams(-1,-1));
+      fullscreenOverlay.addView(stage,new FrameLayout.LayoutParams(-1,-1));
+    }else if(!enabled && fullscreenOverlay!=null){
+      fullscreenOverlay.removeView(stage);((ViewGroup)fullscreenOverlay.getParent()).removeView(fullscreenOverlay);fullscreenOverlay=null;
+      stageParent.addView(stage,stageIndex,stageParams);
+    }
+    vm.fullScreen=enabled;fullscreenBack.setEnabled(enabled);
+    ((TextView)stage.findViewById(R.id.video_fullscreen)).setText(enabled?"退出":"全屏");
+    androidx.core.view.WindowInsetsControllerCompat bars=androidx.core.view.WindowCompat.getInsetsController(requireActivity().getWindow(),requireActivity().getWindow().getDecorView());
+    bars.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+    if(enabled)bars.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());else bars.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+    if(rotate)requireActivity().setRequestedOrientation(enabled?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+  }
+  @Override public void onDestroyView(){
+    closeDialog();
+    if(fullscreenOverlay!=null){((ViewGroup)fullscreenOverlay.getParent()).removeView(fullscreenOverlay);fullscreenOverlay=null;}
+    if(isRemoving() || requireActivity().isFinishing()){
+      vm.fullScreen=false;requireActivity().setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+      androidx.core.view.WindowCompat.getInsetsController(requireActivity().getWindow(),requireActivity().getWindow().getDecorView()).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+    }
+    stage=null;stageParent=null;caption=null;playerView=null;adapter=null;super.onDestroyView();
+  }
   private final class CueAdapter extends RecyclerView.Adapter<CueAdapter.Holder>{
     List<SubtitleSegment> items=Collections.emptyList();
     final class Holder extends RecyclerView.ViewHolder{final TextView text;Holder(TextView text){super(text);this.text=text;}}

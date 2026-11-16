@@ -9,12 +9,14 @@ import java.util.*;
 
 /** Atomic application-private checkpoint; deliberately separate from book Room storage. */
 public final class VideoProjectStore {
+  private static final Object LOCK=new Object();
   private final AtomicFile file;
   private final Gson gson = new Gson();
   public VideoProjectStore(Context context) {
     file = new AtomicFile(new File(context.getFilesDir(), "video-project.json"));
   }
-  public synchronized VideoProject load() throws IOException {
+  public VideoProject load() throws IOException { synchronized(LOCK){return read();} }
+  private VideoProject read() throws IOException {
     byte[] raw;
     try (InputStream input=file.openRead()) {
       ByteArrayOutputStream out=new ByteArrayOutputStream(); byte[] buffer=new byte[8192]; int count;
@@ -36,7 +38,8 @@ public final class VideoProjectStore {
           value.translationKey,value.demo,value.positionMs,cues);
     } catch (RuntimeException malformed) { throw new IOException("上次视频项目无法读取，请重新选择视频和字幕", malformed); }
   }
-  public synchronized void save(VideoProject project) throws IOException {
+  public void save(VideoProject project) throws IOException { synchronized(LOCK){write(project);} }
+  private void write(VideoProject project) throws IOException {
     byte[] raw=gson.toJson(project).getBytes(StandardCharsets.UTF_8);
     if (raw.length>16*1024*1024) throw new IOException("视频项目超过本地保存限制");
     FileOutputStream output=null;

@@ -91,6 +91,7 @@ class Gateway:
         self.slots = threading.BoundedSemaphore(2)
         self.rate_lock = threading.Lock()
         self.calls = []
+        self.asr = None
 
     def _translate(self, value):
         if not isinstance(value, dict) or set(value) - {"q", "source", "target", "format", "context", "profile"}:
@@ -166,9 +167,15 @@ class Gateway:
     def __call__(self, environ, start_response):
         try:
             path, method = environ.get("PATH_INFO"), environ.get("REQUEST_METHOD")
+            if path and path.startswith("/asr/"):
+                if self.asr is None:
+                    from asr import AsrGateway
+                    self.asr = AsrGateway(self.config)
+                return self.asr.handle(environ, start_response)
             if path == "/health" and method == "GET":
                 return self._reply(start_response, 200, {"status": "ok", "model": self.config.model,
                                                        "selectionContext": True, "subtitleProfile": True,
+                                                       "speechRecognition": bool(os.getenv("ASR_PUBLIC_URL")),
                                                        "directions": ["en:zh", "zh:en"]})
             if path != "/translate":
                 raise ServiceError(404, "接口不存在")

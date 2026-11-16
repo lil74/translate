@@ -8,3 +8,14 @@ services:
       - /tmp
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - asr-data:/var/lib/bilingualreader/asr
+  asr-cleanup:
+    build: ../../backend
+    restart: unless-stopped
+    read_only: true
+    command: ["/bin/sh", "-c", "while true; do python /app/asr.py; sleep 600; done"]
+    volumes:
+      - asr-data:/var/lib/bilingualreader/asr
+volumes:
+  asr-data:
