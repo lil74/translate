@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-16",
+  "source": "Generated English speech; no private media",
+  "model": "paraformer-v2",
+  "seconds": 3.953,
+  "segments": [
+    {
+      "startMs": 40,
+      "endMs": 3460,
+      "text": "Hello everyone, today we are learning English. "
+    },
+    {
+      "startMs": 4310,
+      "endMs": 6740,
+      "text": "Please open your book and read the first sentence. "
+    }
+  ]
+}

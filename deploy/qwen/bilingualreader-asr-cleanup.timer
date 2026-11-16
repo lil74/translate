@@ -1,0 +1,7 @@
+[Unit]
+Description=Clean temporary speech files every ten minutes
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+[Install]
+WantedBy=timers.target

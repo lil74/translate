@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove expired BilingualReader ASR temporary files
+[Service]
+Type=oneshot
+User=readertranslate
+Group=readertranslate
+ExecStart=/usr/bin/python3 /opt/bilingualreader/app/asr.py
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bilingualreader
+ProtectHome=true
+NoNewPrivileges=true

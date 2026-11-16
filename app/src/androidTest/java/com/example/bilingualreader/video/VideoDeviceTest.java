@@ -156,14 +156,53 @@ public final class VideoDeviceTest {
       assertTrue(vm.project().cues.get(1).translatedText.startsWith("call:3:"));});
   }
   @Test public void recognizesEnglishFromActualVideoWithoutSubtitleFile()throws Exception {
-    main(()->vm.recognize(.6f,1f));
+    main(()->{try{vm.recognize(.6f,1f,vm.prepareEnglishOcr());}catch(Exception error){throw new AssertionError(error);}});
     await(()->modelReady(false));
     main(()->{
       assertEquals("画面英文 OCR",vm.project().subtitleName);
+      assertEquals(vm.project().cues.size(),vm.project().translatedCount());
+      assertTrue(calls.get()>0);
       assertFalse(vm.project().cues.isEmpty());
       assertEquals(SubtitleSegment.TextSource.OCR,vm.project().cues.get(0).textSource);
       assertTrue(vm.project().cues.get(0).sourceText.toLowerCase(java.util.Locale.ROOT).contains("hello"));
     });
+  }
+  @Test public void fullscreenRotatesAndBackRestoresPositionSpeedAndCaptions()throws Exception {
+    await(()->{AtomicBoolean ready=new AtomicBoolean();scenario.onActivity(activity->{
+      Player player=((PlayerView)activity.findViewById(R.id.video_player)).getPlayer();
+      ready.set(player!=null && player.getPlaybackState()==Player.STATE_READY);
+    });return ready.get();});
+    scenario.onActivity(activity->{
+      Player player=((PlayerView)activity.findViewById(R.id.video_player)).getPlayer();
+      vm.playbackSpeed=2f;player.setPlaybackSpeed(2f);player.pause();player.seekTo(700);
+      activity.findViewById(R.id.video_fullscreen).performClick();
+    });
+    await(()->{AtomicBoolean ready=new AtomicBoolean();scenario.onActivity(activity->{
+      View stage=activity.findViewById(R.id.video_stage),content=activity.findViewById(android.R.id.content);
+      ready.set(vm.fullScreen && activity.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE
+          && stage!=null && stage.getWidth()>=content.getWidth()-4 && stage.getHeight()>=content.getHeight()-4);
+    });return ready.get();});
+    scenario.onActivity(activity->{
+      Player player=((PlayerView)activity.findViewById(R.id.video_player)).getPlayer();
+      assertEquals(2f,player.getPlaybackParameters().speed,0.01f);assertFalse(player.getPlayWhenReady());
+      assertTrue(Math.abs(player.getCurrentPosition()-700)<150);
+      assertTrue(((TextView)activity.findViewById(R.id.video_speed)).getText().toString().contains("2.0"));
+      activity.getOnBackPressedDispatcher().onBackPressed();
+    });
+    await(()->{AtomicBoolean ready=new AtomicBoolean();scenario.onActivity(activity->{
+      ready.set(!vm.fullScreen && activity.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT);
+    });return ready.get();});
+    scenario.onActivity(activity->{
+      assertEquals(2,vm.project().cues.size());
+      Player player=((PlayerView)activity.findViewById(R.id.video_player)).getPlayer();
+      assertEquals(2f,player.getPlaybackParameters().speed,0.01f);assertTrue(Math.abs(player.getCurrentPosition()-700)<150);
+      assertEquals("全屏",((TextView)activity.findViewById(R.id.video_fullscreen)).getText().toString());
+    });
+  }
+  @Test public void missingAudioIsRejectedBeforeUpload()throws Exception {
+    AtomicReference<Uri> video=new AtomicReference<>();main(()->video.set(Uri.parse(vm.project().videoUri)));
+    try{VideoAudio.extract(context,video.get());fail("Expected missing audio error");}
+    catch(IllegalArgumentException expected){assertTrue(expected.getMessage().contains("没有音轨"));}
   }
   private static void encode(File output)throws Exception {
     MediaCodec codec=MediaCodec.createEncoderByType("video/avc");
