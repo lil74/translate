@@ -33,7 +33,7 @@ public final class TocFragment extends BaseFragment {
     ((TextView) view.findViewById(R.id.book_title)).setText(title);
 
     TocAdapter adapter =
-        new TocAdapter(e -> host().openReader(book, title, e.getChapterId(), e.getParagraphId()));
+        new TocAdapter(e -> selectChapter(book, title, e.getChapterId(), e.getParagraphId()));
     RecyclerView list = view.findViewById(R.id.list);
     list.setLayoutManager(new LinearLayoutManager(requireContext()));
     list.setAdapter(adapter);
@@ -56,9 +56,28 @@ public final class TocFragment extends BaseFragment {
           }
         });
     view.findViewById(R.id.continue_reading)
-        .setOnClickListener(v -> host().openReader(book, title, null, null));
+        .setOnClickListener(
+            v -> {
+              if (requireArguments().getString("readerResultKey") != null)
+                getParentFragmentManager().popBackStack();
+              else host().openReader(book, title, null, null);
+            });
     view.findViewById(R.id.retry).setOnClickListener(v -> vm.load(book));
     vm.load(book);
+  }
+
+  private void selectChapter(String book, String title, String chapter, String paragraph) {
+    String key = requireArguments().getString("readerResultKey");
+    if (key == null) {
+      host().openReader(book, title, chapter, paragraph);
+      return;
+    }
+    if (getParentFragmentManager().isStateSaved()) return;
+    Bundle result = new Bundle();
+    result.putString("chapter", chapter);
+    result.putString("paragraph", paragraph);
+    getParentFragmentManager().setFragmentResult(key, result);
+    getParentFragmentManager().popBackStack();
   }
 
   @Override

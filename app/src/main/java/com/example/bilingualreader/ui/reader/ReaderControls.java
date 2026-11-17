@@ -30,7 +30,7 @@ final class ReaderControls {
     panel = root.findViewById(R.id.reader_panel);
     toolbar = root.findViewById(R.id.reader_toolbar);
     toolbar.setNavigationIcon(R.drawable.reader_back);
-    toolbar.setNavigationContentDescription("返回目录");
+    toolbar.setNavigationContentDescription("返回");
     toolbar.setNavigationOnClickListener(
         v -> owner.requireActivity().getOnBackPressedDispatcher().onBackPressed());
     toolbar.setTitleTextAppearance(

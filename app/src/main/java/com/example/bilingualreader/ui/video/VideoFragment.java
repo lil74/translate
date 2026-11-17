@@ -67,7 +67,7 @@ public final class VideoFragment extends BaseFragment {
     Runnable apply=()->{loadedUri=null;vm.video(uri,name(uri));};
     if(vm.project().videoUri!=null && !vm.project().videoUri.equals(uri.toString()) && !vm.project().cues.isEmpty()){
       closeDialog();dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("切换到另一个视频？")
-          .setMessage("初版保留一个视频项目。切换后会清除当前字幕和译文，请先导出需要保留的字幕。")
+          .setMessage("当前视频的字幕和译文会保存在视频库中，新视频将使用独立的项目。")
           .setNegativeButton("取消",null).setPositiveButton("切换",(d,w)->apply.run()).show();
     }else apply.run();
   }
@@ -75,10 +75,11 @@ public final class VideoFragment extends BaseFragment {
     super.onViewCreated(view,state);
     vm=new ViewModelProvider(this,new ViewModelProvider.Factory(){
       @NonNull @Override public <T extends ViewModel>T create(@NonNull Class<T> type){
-        return type.cast(new VideoViewModel(requireContext(),graph()));
+        return type.cast(new VideoViewModel(requireContext(),graph(),getArguments()==null?null:getArguments().getString("videoUri")));
       }
     }).get(VideoViewModel.class);
     if(state!=null){exportVtt=state.getBoolean("vtt");exportBilingual=state.getBoolean("bilingual",true);}
+    if(getArguments()!=null&&getArguments().containsKey("videoUri"))view.findViewById(R.id.video_pick).setVisibility(View.GONE);
     playerView=view.findViewById(R.id.video_player);caption=view.findViewById(R.id.video_caption);
     RecyclerView list=view.findViewById(R.id.video_cues);
     list.setLayoutManager(new LinearLayoutManager(requireContext()));adapter=new CueAdapter();list.setAdapter(adapter);

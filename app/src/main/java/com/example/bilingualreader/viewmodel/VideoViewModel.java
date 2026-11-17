@@ -21,7 +21,7 @@ public final class VideoViewModel extends ViewModel {
   private final VideoProjectStore store;
   private final Handler main=new Handler(Looper.getMainLooper());
   // Shared file queue orders the departing screen's final checkpoint before a new screen restores it.
-  private static final ExecutorService io=Executors.newSingleThreadExecutor();
+  private static final ExecutorService io=VideoProjectStore.IO;
   private final ExecutorService network=Executors.newSingleThreadExecutor();
   private VideoProject project=VideoProject.empty();
   private volatile long generation;
@@ -37,9 +37,12 @@ public final class VideoViewModel extends ViewModel {
   private final Runnable saveLater=this::persist;
 
   public VideoViewModel(Context context, AppContainer graph) {
+    this(context,graph,null);
+  }
+  public VideoViewModel(Context context, AppContainer graph,String requestedUri) {
     this.context=context.getApplicationContext(); this.graph=graph; store=new VideoProjectStore(this.context);
     io.execute(() -> {
-      try { VideoProject restored=store.load(); main.post(() -> {
+      try { VideoProject restored=requestedUri==null?store.load():store.load(requestedUri); main.post(() -> {
         if (cleared || generation!=0) return;
         project=restored; initialized=true; busy=false; message="选择视频及对应的 SRT/VTT 字幕文件"; publish();
       }); } catch (IOException error) { main.post(() -> { if (!cleared && generation==0) {
@@ -64,6 +67,8 @@ public final class VideoViewModel extends ViewModel {
   }
   public void video(Uri uri, String name) {
     cancel();
+    VideoProject previous=project;
+    if(previous.videoUri!=null)io.execute(()->{try{store.save(previous);}catch(IOException ignored){}});
     boolean replacing=project.videoUri!=null && !project.videoUri.equals(uri.toString());
     project=new VideoProject(uri.toString(),name,replacing?null:project.subtitleName,project.direction,
         replacing?null:project.translationKey,replacing?false:project.demo,0,

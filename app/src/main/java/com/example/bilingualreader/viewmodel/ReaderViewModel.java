@@ -135,6 +135,14 @@ public final class ReaderViewModel extends BaseViewModel {
         });
   }
 
+  /** Explicit TOC navigation also works if the reader is being restored after process death. */
+  public void openAt(String book, String chapter, String paragraph) {
+    flushProgress();
+    viewport = null;
+    bookId = null;
+    open(book, chapter, paragraph);
+  }
+
   public void retryOpen() {
     if (bookId == null) return;
     String book = bookId;
@@ -200,15 +208,19 @@ public final class ReaderViewModel extends BaseViewModel {
   }
 
   public void retranslate() {
-    String id=chapterId.getValue();
-    if(id!=null)execute(() -> {
-      if(!(graph.translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator))
-        throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,"当前翻译服务不支持重新翻译",false);
-      ((com.example.bilingualreader.translation.WorkTranslationCoordinator)graph.translation)
-          .retranslateChapter(id,"en","zh-CN");
-      return "已使用当前服务重新翻译本章";
-    });
+    String id = chapterId.getValue();
+    if (id != null)
+      execute(
+          () -> {
+            if (!(graph.translation
+                instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator))
+              throw new AppException(ErrorCode.UNSUPPORTED_CONTENT, "当前翻译服务不支持重新翻译", false);
+            ((com.example.bilingualreader.translation.WorkTranslationCoordinator) graph.translation)
+                .retranslateChapter(id, "en", "zh-CN");
+            return "已使用当前服务重新翻译本章";
+          });
   }
+
   public void cancel() {
     TranslationTask t = task.getValue();
     if (t != null)
