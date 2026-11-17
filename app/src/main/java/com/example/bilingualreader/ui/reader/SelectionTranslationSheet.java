@@ -166,14 +166,7 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
               vm.cancel();
               dismiss();
             });
-    if (vm.result.getValue() == null) {
-      if (vm.demo) vm.translate(selected,context);
-      else {
-        ((TextView) view.findViewById(R.id.selection_result))
-            .setText(context==null?R.string.selection_online_notice:R.string.selection_context_consent);
-        retry.setText(context==null?R.string.selection_confirm:R.string.selection_context_confirm);
-      }
-    }
+    if (vm.result.getValue() == null) vm.translate(selected,context);
   }
 
   @Override

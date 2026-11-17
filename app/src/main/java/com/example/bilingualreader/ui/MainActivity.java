@@ -80,6 +80,10 @@ public final class MainActivity extends AppCompatActivity {
     push(new com.example.bilingualreader.ui.lookup.LookupFragment());
   }
 
+  public void openWord(String word) {
+    push(com.example.bilingualreader.ui.lookup.WordDetailFragment.create(word));
+  }
+
   public void openVideo() {
     push(new com.example.bilingualreader.ui.video.VideoFragment());
   }

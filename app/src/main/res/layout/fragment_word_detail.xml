@@ -1,0 +1,15 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/background" android:fillViewport="true">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+   <TextView android:id="@+id/word_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="40sp" android:textColor="@color/ink" android:textStyle="bold" android:textIsSelectable="true"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/word_speak" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="朗读" android:contentDescription="播放单词读音"/>
+  </LinearLayout>
+  <TextView android:id="@+id/word_phonetic" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="19sp" android:textColor="@color/muted" android:paddingVertical="12dp"/>
+  <TextView android:id="@+id/word_tags" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" android:textColor="@color/muted" android:paddingBottom="24dp"/>
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="中文释义" android:textSize="22sp" android:textStyle="bold" android:textColor="@color/primary" android:paddingBottom="16dp"/>
+  <ProgressBar android:id="@+id/word_loading" android:layout_width="32dp" android:layout_height="32dp" android:layout_gravity="center"/>
+  <TextView android:id="@+id/word_meaning" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="19sp" android:textColor="@color/ink" android:lineSpacingMultiplier="1.5" android:textIsSelectable="true"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/word_retry" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="重试" android:visibility="gone"/>
+  <TextView android:id="@+id/word_source" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="32dp" android:textSize="12sp" android:textColor="@color/muted" android:autoLink="web"/>
+ </LinearLayout>
+</ScrollView>

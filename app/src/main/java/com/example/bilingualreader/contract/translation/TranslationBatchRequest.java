@@ -4,7 +4,7 @@ import com.example.bilingualreader.contract.model.*;
 import java.util.*;
 
 public final class TranslationBatchRequest {
-  public enum Purpose { GENERAL, SUBTITLE }
+  public enum Purpose { GENERAL, SUBTITLE, DICTIONARY }
   private final Purpose purpose;
   private final String taskId;
   private final String requestId;

@@ -101,7 +101,7 @@ public class SelectionTranslationDeviceTest {
     return text.get();
   }
 
-  @Test public void onlineSheetRequiresExplicitClickAndPreservesSelectedText() throws Exception {
+  @Test public void onlineSheetAutomaticallyTranslatesAndPreservesSelectedText() throws Exception {
     AtomicInteger calls = new AtomicInteger();
     AtomicReference<TranslationBatchRequest> captured = new AtomicReference<>();
     main(() -> graph.setSelectionTranslation(request -> {
@@ -109,11 +109,11 @@ public class SelectionTranslationDeviceTest {
     }, false));
     String selected = "  Hello, world!\n\uD83D\uDE00  ";
     showSheet(selected);
-    assertEquals(0, calls.get());
+    await(() -> calls.get() == 1);
+    await(() -> sheetText(R.id.selection_result).equals("译文:" + selected));
     assertEquals(selected, sheetText(R.id.selection_source));
     scenario.recreate();
-    assertEquals(0, calls.get());
-    click(R.id.selection_retry);
+    assertEquals(1, calls.get());
     await(() -> calls.get() == 1);
     await(() -> sheetText(R.id.selection_result).equals("译文:" + selected));
     TranslationBatchRequest request = captured.get();

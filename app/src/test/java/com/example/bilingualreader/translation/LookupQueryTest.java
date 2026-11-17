@@ -15,6 +15,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 public class LookupQueryTest {
+  @Test public void onlySingleEnglishWordsUseDictionaryPurpose()throws Exception {
+    for(String text:new String[]{"bank"," beautiful ","well-known","don't"})
+      assertEquals(TranslationBatchRequest.Purpose.DICTIONARY,LookupQuery.request(text,0).getPurpose());
+    for(String text:new String[]{"hello world","Hello!","你好","123"})
+      assertEquals(TranslationBatchRequest.Purpose.GENERAL,LookupQuery.request(text,LookupQuery.ZH_TO_EN).getPurpose());
+    assertEquals(TranslationBatchRequest.Purpose.GENERAL,LookupQuery.request("hello world",0).getPurpose());
+  }
   @Test
   public void automaticDirectionAndManualOverride() throws Exception {
     assertEquals("en", LookupQuery.source("Hello, world!", 0));
@@ -181,6 +188,7 @@ public class LookupQueryTest {
                         .getAsJsonObject());
                 JsonObject response = new JsonObject();
                 response.addProperty("translatedText", translated);
+                if(received.get().has("profile"))response.addProperty("dictionary",true);
                 byte[] bytes = response.toString().getBytes(StandardCharsets.UTF_8);
                 OutputStream out = socket.getOutputStream();
                 out.write(
