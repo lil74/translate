@@ -1,0 +1,31 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="24dp" android:paddingBottom="24dp">
+<TextView android:id="@+id/home_lookup" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/lookup_home_field" android:drawableStart="@drawable/ic_lookup_search" android:drawablePadding="10dp" android:text="输入中英文，查词、翻译…" android:textColor="?attr/paletteMuted" android:singleLine="true" android:ellipsize="end" android:clickable="true" android:focusable="true"/>
+<TextView style="@style/HomeHeading" android:text="继续学习"/>
+<com.google.android.material.card.MaterialCardView android:id="@+id/home_book" style="@style/HomeCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:clickable="true" android:focusable="true"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" android:orientation="vertical">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+<ImageView android:layout_width="48dp" android:layout_height="64dp" android:layout_marginEnd="16dp" android:src="@drawable/ic_home_library" android:importantForAccessibility="no"/>
+<LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="上次阅读" android:textColor="?attr/palettePrimary" android:textSize="12sp"/>
+<TextView android:id="@+id/home_book_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="还没有阅读记录" android:textColor="?attr/paletteInk" android:textStyle="bold" android:textSize="21sp" android:layout_marginTop="6dp" android:maxLines="2" android:ellipsize="end"/>
+<TextView android:id="@+id/home_book_position" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" style="@style/MutedText"/>
+</LinearLayout></LinearLayout>
+<ProgressBar android:id="@+id/home_book_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="16dp" android:max="100" android:visibility="gone"/>
+<TextView android:id="@+id/home_book_action" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:layout_marginTop="12dp" android:text="打开书架 →" android:textColor="?attr/palettePrimary"/>
+</LinearLayout></com.google.android.material.card.MaterialCardView>
+<com.google.android.material.card.MaterialCardView android:id="@+id/home_video" style="@style/HomeCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:clickable="true" android:focusable="true"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="上次观看" android:textColor="?attr/palettePrimary" android:textSize="12sp"/>
+<TextView android:id="@+id/home_video_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="还没有观看记录" android:textSize="18sp" android:textStyle="bold" android:maxLines="2" android:ellipsize="end"/>
+<TextView android:id="@+id/home_video_position" android:layout_width="match_parent" android:layout_height="wrap_content" style="@style/MutedText" android:layout_marginTop="6dp"/>
+<TextView android:id="@+id/home_video_action" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="end" android:text="打开视频 →" android:textColor="?attr/palettePrimary" android:layout_marginTop="10dp"/>
+</LinearLayout></com.google.android.material.card.MaterialCardView>
+<TextView style="@style/HomeHeading" android:text="学习素材"/>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+<LinearLayout android:id="@+id/home_library" android:layout_width="0dp" android:layout_weight="1" android:layout_height="112dp" android:layout_marginEnd="12dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/soft_panel" android:clickable="true" android:focusable="true" android:contentDescription="我的书架">
+<ImageView android:layout_width="40dp" android:layout_height="40dp" android:scaleType="fitCenter" android:src="@drawable/ic_home_library" android:importantForAccessibility="no"/>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="我的书架" android:textSize="17sp" android:textStyle="bold" android:textColor="?attr/palettePrimary"/>
+</LinearLayout>
+<LinearLayout android:id="@+id/home_videos" android:layout_width="0dp" android:layout_weight="1" android:layout_height="112dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/soft_panel" android:clickable="true" android:focusable="true" android:contentDescription="我的视频">
+<ImageView android:layout_width="40dp" android:layout_height="40dp" android:scaleType="fitCenter" android:src="@drawable/ic_home_video" android:importantForAccessibility="no"/>
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="我的视频" android:textSize="17sp" android:textStyle="bold" android:textColor="?attr/palettePrimary"/>
+</LinearLayout>
+</LinearLayout></LinearLayout></ScrollView>
