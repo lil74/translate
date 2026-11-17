@@ -1,15 +1,12 @@
 package com.example.bilingualreader.ui.bookshelf;
 
-import android.os.Bundle;
-import android.net.Uri;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.view.View;
 import android.widget.*;
-import java.util.Locale;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.*;
@@ -19,9 +16,13 @@ import com.example.bilingualreader.contract.model.Book;
 import com.example.bilingualreader.ui.*;
 import com.example.bilingualreader.viewmodel.*;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import java.util.Locale;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public final class BookshelfFragment extends BaseFragment {
   private BookshelfViewModel vm;
+  private MediaGridAdapter<Book> adapter;
   private final ActivityResultLauncher<String[]> picker =
       registerForActivityResult(
           new ActivityResultContracts.OpenDocument(),
@@ -41,31 +42,27 @@ public final class BookshelfFragment extends BaseFragment {
     super.onViewCreated(view, state);
     vm = models().get(BookshelfViewModel.class);
     commands(vm);
-    view.findViewById(R.id.open_lookup).setOnClickListener(v -> host().openLookup());
-    view.findViewById(R.id.open_video).setOnClickListener(v -> host().openVideo());
-    ((TextView) view.findViewById(R.id.mode_banner))
-        .setText("导入 EPUB/TXT 开始阅读 · 翻译本章可生成逐段译文\n"
-            + (graph().demo || graph().translationConfig != null
-                && com.example.bilingualreader.translation.TranslationConfigStore.MOCK.equals(graph().translationConfig.mode())
-                ? "当前为模拟验证，译文有明确标记；可在右上角配置在线服务。"
-                : "在线翻译服务可在右上角菜单中配置。"));
-    EntryAdapter<Book> adapter =
-        new EntryAdapter<>(
-            new EntryAdapter.Presenter<Book>() {
-              public String title(Book b) {
-                return (new com.example.bilingualreader.ui.reader.ReaderLocalStore(requireContext()).favorite(b.getBookId()) ? "★ " : "") + b.getTitle();
+    adapter =
+        new MediaGridAdapter<>(
+            new MediaGridAdapter.Presenter<Book>() {
+              public String key(Book b) {
+                return b.getBookId();
               }
 
-              public String subtitle(Book b) {
-                return b.getAuthor()
-                    + "\n"
-                    + b.getChapterCount()
-                    + " 节 · "
-                    + (b.getLastReadAt() == null ? "开始阅读" : "继续阅读");
+              public String image(Book b) {
+                return b.getCoverPath();
+              }
+
+              public String title(Book b) {
+                return (new com.example.bilingualreader.ui.reader.ReaderLocalStore(requireContext())
+                            .favorite(b.getBookId())
+                        ? "★ "
+                        : "")
+                    + b.getTitle();
               }
 
               public void click(Book b) {
-                host().openToc(b.getBookId(), b.getTitle());
+                host().openReader(b.getBookId(), b.getTitle(), null, null);
               }
 
               public void longClick(Book b) {
@@ -76,9 +73,10 @@ public final class BookshelfFragment extends BaseFragment {
                     .setPositiveButton("删除", (d, w) -> vm.deleteBook(b.getBookId()))
                     .show();
               }
-            });
+            },
+            false);
     RecyclerView list = view.findViewById(R.id.list);
-    list.setLayoutManager(new LinearLayoutManager(requireContext()));
+    MediaGridAdapter.layout(list, false);
     list.setAdapter(adapter);
     vm.books.observe(
         getViewLifecycleOwner(),
@@ -86,9 +84,15 @@ public final class BookshelfFragment extends BaseFragment {
           view.findViewById(R.id.loading)
               .setVisibility(s.status == UiState.Status.LOADING ? View.VISIBLE : View.GONE);
           if (s.data != null) {
-            adapter.submit(s.data);
-            view.findViewById(R.id.empty)
-                .setVisibility(s.data.isEmpty() ? View.VISIBLE : View.GONE);
+            java.util.List<Book> shown = new java.util.ArrayList<>();
+            boolean favorites = getArguments() != null && getArguments().getBoolean("favorites");
+            com.example.bilingualreader.ui.reader.ReaderLocalStore local =
+                new com.example.bilingualreader.ui.reader.ReaderLocalStore(requireContext());
+            for (Book book : s.data)
+              if (!favorites || local.favorite(book.getBookId())) shown.add(book);
+            adapter.submit(shown);
+            if (favorites) ((TextView) view.findViewById(R.id.empty)).setText("还没有收藏的书籍");
+            view.findViewById(R.id.empty).setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
           }
         });
     vm.command.observe(
@@ -100,50 +104,82 @@ public final class BookshelfFragment extends BaseFragment {
         });
     view.findViewById(R.id.import_book)
         .setOnClickListener(
-            v -> picker.launch(new String[] {"application/epub+zip", "text/plain", "application/octet-stream"}));
+            v ->
+                picker.launch(
+                    new String[] {
+                      "application/epub+zip", "text/plain", "application/octet-stream"
+                    }));
   }
 
   private boolean isTxt(Uri uri) {
-    String mime=requireContext().getContentResolver().getType(uri);
+    String mime = requireContext().getContentResolver().getType(uri);
     if ("text/plain".equals(mime)) return true;
-    try (Cursor cursor=requireContext().getContentResolver().query(uri,null,null,null,null)) {
-      if (cursor!=null && cursor.moveToFirst()) {
-        int column=cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-        if (column>=0) return cursor.getString(column).toLowerCase(Locale.ROOT).endsWith(".txt");
+    try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
+      if (cursor != null && cursor.moveToFirst()) {
+        int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+        if (column >= 0) return cursor.getString(column).toLowerCase(Locale.ROOT).endsWith(".txt");
       }
-    } catch (RuntimeException ignored) { }
-    return uri.getLastPathSegment()!=null && uri.getLastPathSegment().toLowerCase(Locale.ROOT).endsWith(".txt");
+    } catch (RuntimeException ignored) {
+    }
+    return uri.getLastPathSegment() != null
+        && uri.getLastPathSegment().toLowerCase(Locale.ROOT).endsWith(".txt");
   }
 
   private void showTxtImport(Uri uri) {
-    EditText input=new EditText(requireContext());
+    EditText input = new EditText(requireContext());
     input.setHint("例如：^第[一二三四五六七八九十\\d]+章.*$");
     input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
     input.setMinLines(2);
-    int padding=(int)(20*getResources().getDisplayMetrics().density);
-    input.setPadding(padding,padding,padding,padding);
-    androidx.appcompat.app.AlertDialog dialog=new MaterialAlertDialogBuilder(requireContext())
-        .setTitle("TXT 目录识别")
-        .setMessage("留空使用内置章节规则。也可填写 Java 正则表达式匹配整行章节标题；第一个捕获组可作为目录名称。")
-        .setView(input)
-        .setNegativeButton("取消",null)
-        .setPositiveButton("导入",null)
-        .create();
-    dialog.setOnShowListener(ignored -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-      String regex=input.getText().toString().trim();
-      if (!regex.isEmpty()) {
-        if (regex.length()>300) {input.setError("正则表达式不能超过 300 字符");return;}
-        try {Pattern.compile(regex);} catch (PatternSyntaxException e) {input.setError("正则表达式无效："+e.getDescription());return;}
-      }
-      vm.importBook(uri,regex);
-      dialog.dismiss();
-    }));
+    int padding = (int) (20 * getResources().getDisplayMetrics().density);
+    input.setPadding(padding, padding, padding, padding);
+    androidx.appcompat.app.AlertDialog dialog =
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("TXT 目录识别")
+            .setMessage("留空使用内置章节规则。也可填写 Java 正则表达式匹配整行章节标题；第一个捕获组可作为目录名称。")
+            .setView(input)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("导入", null)
+            .create();
+    dialog.setOnShowListener(
+        ignored ->
+            dialog
+                .getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(
+                    v -> {
+                      String regex = input.getText().toString().trim();
+                      if (!regex.isEmpty()) {
+                        if (regex.length() > 300) {
+                          input.setError("正则表达式不能超过 300 字符");
+                          return;
+                        }
+                        try {
+                          Pattern.compile(regex);
+                        } catch (PatternSyntaxException e) {
+                          input.setError("正则表达式无效：" + e.getDescription());
+                          return;
+                        }
+                      }
+                      vm.importBook(uri, regex);
+                      dialog.dismiss();
+                    }));
     dialog.show();
+  }
+
+  @Override
+  public void onDestroyView() {
+    if (adapter != null) {
+      adapter.close();
+      adapter = null;
+    }
+    super.onDestroyView();
   }
 
   @Override
   public void onResume() {
     super.onResume();
-    host().page("轻阅 / LIBRARY", false);
+    host()
+        .page(
+            getArguments() != null && getArguments().getBoolean("favorites") ? "我的收藏" : "我的书架",
+            true);
   }
 }

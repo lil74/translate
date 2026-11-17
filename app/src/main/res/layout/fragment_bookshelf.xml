@@ -1,17 +1,10 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="24dp">
-    <TextView android:id="@+id/open_lookup" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginBottom="20dp" android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/lookup_home_field" android:drawableStart="@drawable/ic_lookup_search" android:drawablePadding="10dp" android:text="输入中英文｜查词、翻译…" android:textColor="@color/muted" android:textSize="15sp" android:singleLine="true" android:ellipsize="end" android:clickable="true" android:focusable="true" android:contentDescription="搜索中文或英文"/>
-    <com.google.android.material.button.MaterialButton android:id="@+id/open_video" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="视频学习 · 导入视频与字幕"/>
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="读一点，懂多一点。" style="@style/SectionTitle"/>
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="让故事带你走进另一种语言" style="@style/MutedText" android:layout_marginTop="8dp" android:layout_marginBottom="20dp"/>
-    <TextView android:id="@+id/mode_banner" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/soft_panel" style="@style/MutedText" android:layout_marginBottom="16dp"/>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="我的书架" android:textSize="20sp" android:textStyle="bold"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/import_book" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="＋ 导入 EPUB/TXT"/>
-    </LinearLayout>
-    <ProgressBar android:id="@+id/loading" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"/>
-    <TextView android:id="@+id/command_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="正在处理，请稍候…" android:paddingVertical="12dp" style="@style/MutedText" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
-    <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="32dp" android:gravity="center" style="@style/MutedText" android:text="书架还是空的
-导入一本 EPUB 或 TXT，开始你的阅读" android:visibility="gone"/>
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:clipToPadding="false" android:paddingTop="12dp"/>
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="长按书籍可删除 · 阅读进度随读随记" style="@style/MutedText"/>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:gravity="center_vertical">
+<TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="让故事带你走进另一种语言" android:textSize="13sp" android:textColor="?attr/paletteMuted"/>
+<com.google.android.material.button.MaterialButton android:id="@+id/import_book" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="＋ 导入"/>
+</LinearLayout>
+<ProgressBar android:id="@+id/loading" android:layout_width="32dp" android:layout_height="32dp" android:layout_gravity="center"/>
+<TextView android:id="@+id/command_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:text="正在导入…" style="@style/MutedText" android:visibility="gone"/>
+<TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="24dp" android:gravity="center" android:text="还没有书籍" style="@style/MutedText" android:visibility="gone"/>
+<androidx.recyclerview.widget.RecyclerView android:id="@+id/list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:paddingHorizontal="10dp" android:clipToPadding="false"/>
 </LinearLayout>

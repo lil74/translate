@@ -1,0 +1,12 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="24dp" android:orientation="vertical">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="我的语言小站" android:textSize="25sp" android:textStyle="bold" android:layout_marginBottom="24dp"/>
+<com.google.android.material.card.MaterialCardView style="@style/HomeCard" android:layout_width="match_parent" android:layout_height="wrap_content"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" android:orientation="vertical">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="复习空间" android:textSize="20sp" android:textStyle="bold"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="单词 · 句子 · 视频片段" style="@style/MutedText"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="即将开放" android:textColor="?attr/palettePrimary" android:textSize="12sp"/>
+</LinearLayout></com.google.android.material.card.MaterialCardView>
+<TextView android:id="@+id/profile_favorites" style="@style/HomeRow" android:layout_marginTop="20dp" android:text="我的收藏　›"/>
+<TextView android:id="@+id/profile_bookmarks" style="@style/HomeRow" android:text="阅读书签　›"/>
+<TextView android:id="@+id/profile_lookup" style="@style/HomeRow" android:text="查词与翻译　›"/>
+<TextView android:id="@+id/profile_settings" style="@style/HomeRow" android:text="应用设置　›"/>
+</LinearLayout></ScrollView>

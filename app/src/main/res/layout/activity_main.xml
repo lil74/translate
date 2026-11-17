@@ -1,4 +1,7 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/background">
-    <com.google.android.material.appbar.MaterialToolbar android:id="@+id/toolbar" android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="@color/background" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="?attr/paletteBackground">
+    <com.google.android.material.appbar.MaterialToolbar android:id="@+id/toolbar" android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="?attr/paletteBackground" />
     <androidx.fragment.app.FragmentContainerView android:id="@+id/fragment_container" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
-</LinearLayout>
+<LinearLayout android:id="@+id/root_navigation" android:layout_width="match_parent" android:layout_height="64dp" android:paddingHorizontal="28dp" android:paddingVertical="8dp" android:gravity="center" android:background="?attr/paletteSurface">
+<TextView android:id="@+id/nav_home" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="20dp" android:gravity="center" android:text="首页" android:textSize="16sp" android:background="@drawable/root_nav_background" android:textColor="@color/root_nav_text" android:clickable="true" android:focusable="true"/>
+<TextView android:id="@+id/nav_profile" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="我的" android:textSize="16sp" android:background="@drawable/root_nav_background" android:textColor="@color/root_nav_text" android:clickable="true" android:focusable="true"/>
+</LinearLayout></LinearLayout>
