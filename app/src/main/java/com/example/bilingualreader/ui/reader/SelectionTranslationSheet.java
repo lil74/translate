@@ -117,6 +117,10 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
         ?new TranslationInput.Context(requireArguments().getString("contextText"),
             requireArguments().getInt("contextStart"),requireArguments().getInt("contextEnd")):null;
     ((TextView) view.findViewById(R.id.selection_source)).setText(selected);
+    view.findViewById(R.id.selection_save).setOnClickListener(v -> {
+      new ReaderLocalStore(requireContext()).saveExpression(selected);
+      Toast.makeText(requireContext(), "已收藏", Toast.LENGTH_SHORT).show();
+    });
     ImageButton speak=view.findViewById(R.id.selection_pronounce);
     TextView voiceStatus=view.findViewById(R.id.selection_voice_status);
     View voiceSettings=view.findViewById(R.id.selection_voice_settings);

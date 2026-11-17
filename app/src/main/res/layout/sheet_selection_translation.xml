@@ -15,6 +15,7 @@
                 android:maxLines="3" android:ellipsize="end" android:textColor="?attr/paletteInk"
                 android:textIsSelectable="true"/>
         </LinearLayout>
+        <Button android:id="@+id/selection_save" android:layout_width="wrap_content" android:layout_height="48dp" android:text="收藏"/>
         <ImageButton android:id="@+id/selection_pronounce" android:layout_width="48dp" android:layout_height="48dp"
             android:src="@drawable/ic_pronounce" android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/selection_pronounce"/>

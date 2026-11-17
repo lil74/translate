@@ -127,6 +127,10 @@ public final class MainActivity extends AppCompatActivity {
     push(new com.example.bilingualreader.ui.settings.AppSettingsFragment());
   }
 
+  public void openExpressions() {
+    push(new com.example.bilingualreader.ui.profile.ExpressionsFragment());
+  }
+
   public void openBookshelf(boolean favorites) {
     BookshelfFragment fragment = new BookshelfFragment();
     Bundle args = new Bundle();
@@ -154,6 +158,19 @@ public final class MainActivity extends AppCompatActivity {
 
   public void openVideo() {
     push(new com.example.bilingualreader.ui.video.VideoFragment());
+  }
+
+  public void openVideoLibrary() {
+    push(new com.example.bilingualreader.ui.video.VideoLibraryFragment());
+  }
+
+  public void openVideoProject(String uri) {
+    com.example.bilingualreader.ui.video.VideoFragment fragment =
+        new com.example.bilingualreader.ui.video.VideoFragment();
+    Bundle args = new Bundle();
+    args.putString("videoUri", uri);
+    fragment.setArguments(args);
+    push(fragment);
   }
 
   public void openToc(String book, String title, String readerResultKey) {

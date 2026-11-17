@@ -35,6 +35,8 @@ final class ReaderControls {
         v -> owner.requireActivity().getOnBackPressedDispatcher().onBackPressed());
     toolbar.setTitleTextAppearance(
         owner.requireContext(), androidx.appcompat.R.style.TextAppearance_AppCompat_Small);
+    toolbar.setOnClickListener(v -> chapterRule());
+    root.findViewById(R.id.reader_chapter_label).setOnClickListener(v -> chapterRule());
     toolbar
         .getMenu()
         .add(0, R.id.reader_favorite, 0, "收藏")
@@ -89,6 +91,36 @@ final class ReaderControls {
   void title(String value) {
     toolbar.setTitle(value);
     ((TextView) root.findViewById(R.id.reader_chapter_label)).setText(value);
+  }
+
+  private void chapterRule() {
+    android.widget.EditText input = new android.widget.EditText(owner.requireContext());
+    input.setHint("留空使用默认目录规则");
+    input.setText(prefs.getString("chapter_rule:" + owner.bookId(), ""));
+    new MaterialAlertDialogBuilder(owner.requireContext())
+        .setTitle("TXT 目录规则")
+        .setMessage("输入匹配整行章节标题的 Java 正则表达式。第一个捕获组可作为目录名称。")
+        .setView(input)
+        .setNegativeButton("取消", null)
+        .setPositiveButton("应用", (dialog, which) -> {
+          String regex = input.getText().toString().trim();
+          if (regex.length() > 300) { Toast.makeText(owner.requireContext(), "正则表达式不能超过 300 字符", Toast.LENGTH_LONG).show(); return; }
+          try { if (!regex.isEmpty()) java.util.regex.Pattern.compile(regex); }
+          catch (java.util.regex.PatternSyntaxException error) { Toast.makeText(owner.requireContext(), error.getDescription(), Toast.LENGTH_LONG).show(); return; }
+          new Thread(() -> {
+            try {
+              ((com.example.bilingualreader.ReaderApplication) owner.requireActivity().getApplication())
+                  .getContainer().books.updateTxtChapterRule(owner.bookId(), regex);
+              prefs.edit().putString("chapter_rule:" + owner.bookId(), regex).apply();
+              owner.requireActivity().runOnUiThread(() -> {
+                Toast.makeText(owner.requireContext(), "目录已更新", Toast.LENGTH_SHORT).show();
+                owner.requireActivity().getOnBackPressedDispatcher().onBackPressed();
+              });
+            } catch (Exception error) {
+              owner.requireActivity().runOnUiThread(() -> Toast.makeText(owner.requireContext(), error.getMessage(), Toast.LENGTH_LONG).show());
+            }
+          }, "txt-chapter-rule").start();
+        }).show();
   }
 
   boolean isVisible() {

@@ -28,8 +28,7 @@ public final class BookshelfFragment extends BaseFragment {
           new ActivityResultContracts.OpenDocument(),
           uri -> {
             if (uri != null) {
-              if (isTxt(uri)) showTxtImport(uri);
-              else vm.importBook(uri);
+              vm.importBook(uri);
             }
           });
 

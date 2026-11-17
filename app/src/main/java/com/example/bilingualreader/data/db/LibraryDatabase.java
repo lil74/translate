@@ -65,6 +65,10 @@ public abstract class LibraryDatabase extends RoomDatabase {
     @Query("SELECT coverPath FROM books WHERE coverPath IS NOT NULL") List<String> coverPaths();
     @Insert void insertBook(BookRow row);
     @Query("DELETE FROM books WHERE bookId=:id") void deleteBook(String id);
+    @Query("DELETE FROM toc WHERE bookId=:id") void deleteToc(String id);
+    @Query("DELETE FROM chapters WHERE bookId=:id") void deleteChapters(String id);
+    @Query("DELETE FROM progress WHERE bookId=:id") void deleteProgress(String id);
+    @Query("UPDATE books SET chapterCount=:count WHERE bookId=:id") void updateChapterCount(String id,int count);
     @Insert void insertChapters(List<ChapterRow> rows);
     @Insert void insertParagraphs(List<ParagraphRow> rows);
     @Insert void insertToc(List<TocRow> rows);

@@ -94,6 +94,28 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
     }catch(AppException e){Log.e("BookImport", "Import failed: " + e.getCode(), e);throw e;}catch(SecurityException e){Log.e("BookImport", "Import permission denied", e);throw new AppException(ErrorCode.IMPORT_PERMISSION_DENIED,"没有读取文件的权限",false,e);}catch(Exception e){Log.e("BookImport", "Import I/O failed", e);throw new AppException(ErrorCode.IMPORT_IO_ERROR,"导入书籍失败",true,e);}finally{temp.delete();if(!committed){if(movedFile!=null)movedFile.delete();if(savedCover!=null)savedCover.delete();}}
   }
   private static Book book(BookRow r){return new Book(r.bookId,r.title,r.author,r.language,r.originalFileName,r.localFilePath,r.coverPath,r.chapterCount,r.parserVersion,r.importedAt,r.lastReadAt);}
+  @Override public void updateTxtChapterRule(String id,String regex)throws AppException {
+    BookRow book=dao.book(id);
+    if(book==null)throw err(ErrorCode.BOOK_NOT_FOUND,"Book not found");
+    if(!book.localFilePath.toLowerCase(Locale.ROOT).endsWith(".txt"))
+      throw err(ErrorCode.UNSUPPORTED_CONTENT,"Chapter rules are only available for TXT books");
+    EpubParser.Result parsed=new TxtParser().parse(new File(book.localFilePath),id,book.title,regex);
+    db.runInTransaction(()->{
+      dao.deleteToc(id);
+      dao.deleteProgress(id);
+      dao.deleteChapters(id);
+      List<ChapterRow> chapters=new ArrayList<>();
+      for(Chapter c:parsed.chapters){ChapterRow r=new ChapterRow();r.chapterId=c.getChapterId();r.bookId=id;r.title=c.getTitle();r.resourcePath=c.getResourcePath();r.orderIndex=c.getOrderIndex();r.paragraphCount=c.getParagraphCount();chapters.add(r);}
+      dao.insertChapters(chapters);
+      List<ParagraphRow> paragraphs=new ArrayList<>();
+      for(Paragraph p:parsed.paragraphs){ParagraphRow r=new ParagraphRow();r.paragraphId=p.getParagraphId();r.chapterId=p.getChapterId();r.orderIndex=p.getOrderIndex();r.blockType=p.getBlockType().name();r.originalText=p.getOriginalText();r.sourceHash=p.getSourceHash();paragraphs.add(r);}
+      dao.insertParagraphs(paragraphs);
+      List<TocRow> toc=new ArrayList<>();
+      for(TocEntry t:parsed.toc){TocRow r=new TocRow();r.tocId=t.getTocId();r.bookId=id;r.parentTocId=t.getParentTocId();r.orderIndex=t.getOrderIndex();r.title=t.getTitle();r.chapterId=t.getChapterId();r.paragraphId=t.getParagraphId();toc.add(r);}
+      dao.insertToc(toc);
+      dao.updateChapterCount(id,chapters.size());
+    });
+  }
   public LiveData<List<Book>> observeBooks(){return Transformations.map(dao.observeBooks(),rows->{List<Book> out=new ArrayList<>();for(BookRow r:rows)out.add(book(r));return out;});}
   public List<Chapter> getChapters(String id)throws AppException{if(dao.book(id)==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");List<Chapter> out=new ArrayList<>();for(ChapterRow r:dao.chapters(id))out.add(new Chapter(r.chapterId,r.bookId,r.title,r.orderIndex,r.resourcePath,r.paragraphCount));return out;}
   public List<TocEntry> getTableOfContents(String id)throws AppException{if(dao.book(id)==null)throw err(ErrorCode.BOOK_NOT_FOUND,"书籍不存在");List<TocEntry> out=new ArrayList<>();for(TocRow r:dao.toc(id))out.add(new TocEntry(r.tocId,r.bookId,r.parentTocId,r.orderIndex,r.title,r.chapterId,r.paragraphId));return out;}

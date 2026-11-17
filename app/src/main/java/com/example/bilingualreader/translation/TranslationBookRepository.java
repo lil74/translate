@@ -21,6 +21,12 @@ public final class TranslationBookRepository implements BookRepository {
   public LiveData<List<Book>> observeBooks() { return books.observeBooks(); }
   public List<Chapter> getChapters(String id) throws AppException { return books.getChapters(id); }
   public List<TocEntry> getTableOfContents(String id) throws AppException { return books.getTableOfContents(id); }
+  @Override public void updateTxtChapterRule(String id, String regex) throws AppException {
+    synchronized (WorkTranslationCoordinator.COMMAND_LOCK) {
+      for (TranslationTask task : store.getBookTasks(id)) coordinator.cancelTask(task.getTaskId());
+      books.updateTxtChapterRule(id, regex);
+    }
+  }
   public void deleteBook(String id) throws AppException {
     synchronized (WorkTranslationCoordinator.COMMAND_LOCK) {
       for (TranslationTask task : store.getBookTasks(id)) coordinator.cancelTask(task.getTaskId());

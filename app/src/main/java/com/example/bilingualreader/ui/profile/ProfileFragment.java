@@ -29,7 +29,8 @@ public final class ProfileFragment extends BaseFragment {
             s -> {
               if (s.data != null) books = s.data;
             });
-    view.findViewById(R.id.profile_favorites).setOnClickListener(v -> host().openBookshelf(true));
+    view.findViewById(R.id.profile_favorites).setOnClickListener(v -> host().openExpressions());
+    view.findViewById(R.id.profile_favorite_books).setOnClickListener(v -> host().openBookshelf(true));
     view.findViewById(R.id.profile_lookup).setOnClickListener(v -> host().openLookup());
     view.findViewById(R.id.profile_settings).setOnClickListener(v -> host().openAppSettings());
     view.findViewById(R.id.profile_bookmarks).setOnClickListener(v -> bookmarks());
