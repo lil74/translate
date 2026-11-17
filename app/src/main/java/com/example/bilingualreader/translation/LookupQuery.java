@@ -33,7 +33,13 @@ public final class LookupQuery {
         source,
         "en".equals(source) ? "zh-CN" : "en",
         Collections.singletonList(
-            new TranslationInput(id, TranslationValidation.sha256(text), text)));
+            new TranslationInput(id, TranslationValidation.sha256(text), text)),
+        isDictionaryWord(text, source) ? TranslationBatchRequest.Purpose.DICTIONARY : TranslationBatchRequest.Purpose.GENERAL);
+  }
+
+  public static boolean isDictionaryWord(String text,String source) {
+    return "en".equals(source) && text.trim().length()<=64
+        && text.trim().matches("[A-Za-z]+(?:[-'][A-Za-z]+)*");
   }
 
   public static String translate(TranslationService service, TranslationBatchRequest request)

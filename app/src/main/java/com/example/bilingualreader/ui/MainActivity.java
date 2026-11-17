@@ -148,17 +148,8 @@ public final class MainActivity extends AppCompatActivity {
     push(new com.example.bilingualreader.ui.lookup.LookupFragment());
   }
 
-  public void openVideoLibrary() {
-    push(new com.example.bilingualreader.ui.video.VideoLibraryFragment());
-  }
-
-  public void openVideoProject(String uri) {
-    com.example.bilingualreader.ui.video.VideoFragment fragment =
-        new com.example.bilingualreader.ui.video.VideoFragment();
-    Bundle args = new Bundle();
-    args.putString("videoUri", uri);
-    fragment.setArguments(args);
-    push(fragment);
+  public void openWord(String word) {
+    push(com.example.bilingualreader.ui.lookup.WordDetailFragment.create(word));
   }
 
   public void openVideo() {

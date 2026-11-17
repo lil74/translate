@@ -107,9 +107,11 @@ class Gateway:
         if value.get("format", "text") != "text":
             raise ServiceError(400, "当前仅支持纯文本")
         profile = value.get("profile", "general")
-        if profile not in ("general", "subtitle"):
+        if profile not in ("general", "subtitle", "dictionary"):
             raise ServiceError(400, "不支持的翻译场景")
         context = value.get("context")
+        if profile == "dictionary" and (not forward or context is not None):
+            raise ServiceError(400, "词典查询只支持独立英文单词，不混用段落语境")
         if context is not None and profile == "subtitle":
             raise ServiceError(400, "字幕翻译不能混用阅读选词语境")
         if context is not None:
@@ -128,6 +130,9 @@ class Gateway:
         if not self.slots.acquire(blocking=False):
             raise ServiceError(429, "翻译服务正在处理其他请求", 3)
         try:
+            if profile == "dictionary":
+                from dictionary_lookup import lookup
+                return lookup(self.config, text)
             options = {"source_lang": "English" if forward else "Chinese",
                        "target_lang": "Chinese" if forward else "English",
                        "domains": self.config.domains if forward else (
@@ -176,6 +181,7 @@ class Gateway:
                 return self._reply(start_response, 200, {"status": "ok", "model": self.config.model,
                                                        "selectionContext": True, "subtitleProfile": True,
                                                        "speechRecognition": bool(os.getenv("ASR_PUBLIC_URL")),
+                                                       "dictionaryLookup": True,
                                                        "directions": ["en:zh", "zh:en"]})
             if path != "/translate":
                 raise ServiceError(404, "接口不存在")

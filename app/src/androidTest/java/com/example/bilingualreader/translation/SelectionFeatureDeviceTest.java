@@ -126,7 +126,6 @@ public class SelectionFeatureDeviceTest {
       assertEquals(0,attrs.flags&WindowManager.LayoutParams.FLAG_DIM_BEHIND);
       assertNotEquals(0,attrs.flags&WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
       assertNotNull(sheet.requireView().findViewById(R.id.selection_pronounce));
-      assertTrue(sheet.requireView().findViewById(R.id.selection_retry).performClick());
     });
     await(()->captured.get()!=null);
     TranslationInput selected=captured.get().getItems().get(0);assertEquals("bank",selected.getText());

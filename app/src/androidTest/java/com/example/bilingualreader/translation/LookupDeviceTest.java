@@ -78,6 +78,32 @@ public final class LookupDeviceTest {
       } catch (Exception error) { throw new AssertionError(error); }
     });
   }
+  @Test public void dictionarySectionsRemainSelectableAndShowActualResultKind()throws Exception {
+    main(()->graph.setSelectionTranslation(request->{
+      assertEquals(TranslationBatchRequest.Purpose.DICTIONARY,request.getPurpose());
+      TranslationInput input=request.getItems().get(0);
+      return new TranslationBatchResult(request.getTaskId(),request.getRequestId(),Collections.singletonList(
+          new TranslationOutput(input.getParagraphId(),input.getSourceHash(),TranslationStatus.SUCCESS,
+              "bank\n\n【名词 n.】\n1. 银行；河岸\n\n【动词 v.】\n1. 存款", "dictionary-test","1",null)));
+    },false));
+    scenario=ActivityScenario.launch(MainActivity.class);
+    scenario.onActivity(activity->{
+      activity.openLookup();activity.getSupportFragmentManager().executePendingTransactions();
+      LookupFragment page=(LookupFragment)activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+      ((EditText)page.requireView().findViewById(R.id.lookup_input)).setText("bank");
+      LookupViewModel model=new ViewModelProvider(page,new ViewModelFactory(graph)).get(LookupViewModel.class);
+      try{model.translate(model.prepare());}catch(Exception error){throw new AssertionError(error);}
+    });
+    await(()->{AtomicBoolean done=new AtomicBoolean();scenario.onActivity(activity->{
+      TextView result=activity.findViewById(R.id.lookup_result);done.set(result.getText().toString().contains("动词"));
+    });return done.get();});
+    scenario.onActivity(activity->{
+      TextView result=activity.findViewById(R.id.lookup_result);
+      assertTrue(result.isTextSelectable());assertTrue(result.getText() instanceof android.text.Spanned);
+      assertTrue(((android.text.Spanned)result.getText()).getSpans(0,result.length(),android.text.style.StyleSpan.class).length>=2);
+      assertTrue(((TextView)activity.findViewById(R.id.lookup_result_label)).getText().toString().contains("词典释义"));
+    });
+  }
   @Test public void lateResponseCannotOverwriteEditedInputOrNextQuery() throws Exception {
     CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
     releases.add(release);
@@ -151,7 +177,7 @@ public final class LookupDeviceTest {
       activity.getSupportFragmentManager().executePendingTransactions();
       LookupFragment page = (LookupFragment) activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
       current.set(new ViewModelProvider(page, new ViewModelFactory(graph)).get(LookupViewModel.class));
-      ((EditText) page.requireView().findViewById(R.id.lookup_input)).setText("hello");
+      ((EditText) page.requireView().findViewById(R.id.lookup_input)).setText("hello world");
       page.requireView().findViewById(R.id.lookup_submit).performClick();
     });
     assertTrue(entered.await(5, TimeUnit.SECONDS));

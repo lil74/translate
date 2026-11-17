@@ -52,6 +52,8 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。首次同步需要下�
 
 ## 团队入口
 
+首页单词联想、中文词典详情和本地词库说明见 [单词搜索交互](docs/C4_DICTIONARY_SEARCH.md)。
+
 | 说明 | 文件 |
 |---|---|
 | 每个文件夹做什么、成员接线步骤 | [目录与协作说明](docs/DIRECTORY_GUIDE.md) |

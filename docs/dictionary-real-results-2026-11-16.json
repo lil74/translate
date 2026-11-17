@@ -1,0 +1,78 @@
+[
+  {
+    "word": "bank",
+    "senses": 39,
+    "parts": [
+      "noun",
+      "verb"
+    ],
+    "samples": [
+      "1. 一家可存取款、办理借贷及处理其他金融事务的机构。",
+      "2. 此类机构的分支机构。",
+      "3. 纸牌游戏中负责发牌和管理赌注者；亦称‘banque’。",
+      "4. 由存款或捐款构成的资金池，用于开展业务；即联合股本或资本。"
+    ],
+    "provider": "dictionaryapi+qwen",
+    "model": "qwen-plus",
+    "seconds": 23.435,
+    "source": "https://api.dictionaryapi.dev/api/v2/entries/en/bank"
+  },
+  {
+    "word": "beautiful",
+    "senses": 4,
+    "parts": [
+      "noun",
+      "adjective"
+    ],
+    "samples": [
+      "1. 美丽的人。可用作称呼语。",
+      "1. 有吸引力且具有美感的。",
+      "2. （指天气）宜人的；晴朗的。",
+      "3. 执行得出色的。"
+    ],
+    "provider": "dictionaryapi+qwen",
+    "model": "qwen-plus",
+    "seconds": 5.234,
+    "source": "https://api.dictionaryapi.dev/api/v2/entries/en/beautiful"
+  },
+  {
+    "word": "in",
+    "senses": 30,
+    "parts": [
+      "noun",
+      "verb",
+      "adjective",
+      "adverb",
+      "preposition"
+    ],
+    "samples": [
+      "1. 掌权或有影响力的地位，或获得这种地位的途径。",
+      "2. （主要用复数）在位者；尤指在职人员。",
+      "3. 击球手当前正在击球的状态；参见‘局’（innings）。",
+      "4. 内凹角；凹处或角落。"
+    ],
+    "provider": "dictionaryapi+qwen",
+    "model": "qwen-plus",
+    "seconds": 16.138,
+    "source": "https://api.dictionaryapi.dev/api/v2/entries/en/in"
+  },
+  {
+    "word": "run",
+    "senses": 63,
+    "parts": [
+      "verb",
+      "noun",
+      "adjective"
+    ],
+    "provider": "dictionaryapi+qwen",
+    "model": "qwen-plus",
+    "samples": [
+      "1. 跑。",
+      "2. 迅速移动。",
+      "3. （指液体）流动。",
+      "4. （指船舶）顺风航行，与横驶或抢风航行相区别。"
+    ],
+    "seconds": 15.594,
+    "source": "https://api.dictionaryapi.dev/api/v2/entries/en/run"
+  }
+]

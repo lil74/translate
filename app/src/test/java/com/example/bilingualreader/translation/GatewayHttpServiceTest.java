@@ -15,6 +15,7 @@ public class GatewayHttpServiceTest {
   private ServerSocket server;
   private ExecutorService pool;
   private String endpoint;
+  private final AtomicInteger responseStatus=new AtomicInteger(200);
   private final AtomicReference<String> authorization=new AtomicReference<>();
   private final AtomicReference<String> requestBody=new AtomicReference<>();
   private final AtomicReference<String> response=new AtomicReference<>("{\"translatedText\":\"你好\",\"provider\":\"qwen-mt\",\"engineVersion\":\"qwen-mt-plus\"}");
@@ -35,7 +36,7 @@ public class GatewayHttpServiceTest {
         requestBody.set(body.toString());
         byte[] bytes=response.get().getBytes(StandardCharsets.UTF_8);
         OutputStream output=socket.getOutputStream();
-        output.write(("HTTP/1.1 200 OK\r\nContent-Length: "+bytes.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+        output.write(("HTTP/1.1 "+responseStatus.get()+" Test\r\nContent-Length: "+bytes.length+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
         output.write(bytes);output.flush();
       }return null;
     });
@@ -48,6 +49,24 @@ public class GatewayHttpServiceTest {
     TranslationOutput output=new LibreTranslateService(endpoint,"team-test-token").translate(request()).getItems().get(0);
     assertEquals("Bearer team-test-token",authorization.get());
     assertEquals("qwen-mt",output.getProvider());assertEquals("qwen-mt-plus",output.getEngineVersion());
+  }
+  private TranslationBatchRequest dictionaryRequest(){
+    TranslationBatchRequest base=request();return new TranslationBatchRequest(base.getTaskId(),base.getRequestId(),"en","zh-CN",base.getItems(),TranslationBatchRequest.Purpose.DICTIONARY);
+  }
+  @Test public void dictionaryUsesProfileAndRetainsLexicalProvider()throws Exception {
+    response.set("{\"translatedText\":\"【名词 n.】\\n1. 问候\",\"dictionary\":true,\"provider\":\"dictionaryapi+qwen\",\"engineVersion\":\"qwen-plus\"}");
+    TranslationOutput output=new LibreTranslateService(endpoint).translate(dictionaryRequest()).getItems().get(0);
+    assertEquals("dictionaryapi+qwen",output.getProvider());assertTrue(output.getTranslatedText().contains("名词"));
+    assertTrue(requestBody.get().contains("\"profile\":\"dictionary\""));
+  }
+  @Test public void dictionaryCannotSilentlyUseLegacySingleTranslation()throws Exception {
+    try{new LibreTranslateService(endpoint).translate(dictionaryRequest());fail();}
+    catch(AppException expected){assertEquals(ErrorCode.UNSUPPORTED_CONTENT,expected.getCode());}
+  }
+  @Test public void dictionaryNotFoundPreservesClearUserMessage()throws Exception {
+    responseStatus.set(422);response.set("{\"error\":\"词典未收录，请检查拼写\"}");
+    try{new LibreTranslateService(endpoint).translate(dictionaryRequest());fail();}
+    catch(AppException expected){assertEquals("词典未收录，请检查拼写",expected.getUserMessage());}
   }
   @Test public void originalKeylessLibreEndpointRemainsCompatible()throws Exception {
     response.set("{\"translatedText\":\"你好\"}");
