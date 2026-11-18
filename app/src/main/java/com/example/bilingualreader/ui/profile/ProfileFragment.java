@@ -30,6 +30,8 @@ public final class ProfileFragment extends BaseFragment {
               if (s.data != null) books = s.data;
             });
     view.findViewById(R.id.profile_favorites).setOnClickListener(v -> host().openExpressions());
+    view.findViewById(R.id.profile_account).setOnClickListener(v -> host().openAccount());
+    view.findViewById(R.id.profile_cloud_books).setOnClickListener(v -> host().openCloudBooks());
     view.findViewById(R.id.profile_favorite_books).setOnClickListener(v -> host().openBookshelf(true));
     view.findViewById(R.id.profile_lookup).setOnClickListener(v -> host().openLookup());
     view.findViewById(R.id.profile_settings).setOnClickListener(v -> host().openAppSettings());

@@ -224,6 +224,9 @@ _gateway = None
 
 
 def application(environ, start_response):
+    if (environ.get("PATH_INFO") or "").startswith(("/account/", "/books", "/expressions")):
+        from accounts import application as accounts_application
+        return accounts_application(environ, start_response)
     global _gateway
     if _gateway is None:
         try:

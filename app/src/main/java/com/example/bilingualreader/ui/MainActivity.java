@@ -131,6 +131,14 @@ public final class MainActivity extends AppCompatActivity {
     push(new com.example.bilingualreader.ui.profile.ExpressionsFragment());
   }
 
+  public void openAccount() {
+    push(new com.example.bilingualreader.ui.profile.AccountFragment());
+  }
+
+  public void openCloudBooks() {
+    push(new com.example.bilingualreader.ui.profile.CloudBooksFragment());
+  }
+
   public void openBookshelf(boolean favorites) {
     BookshelfFragment fragment = new BookshelfFragment();
     Bundle args = new Bundle();

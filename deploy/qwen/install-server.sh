@@ -16,6 +16,7 @@ python3 -m venv /opt/bilingualreader/acme-venv
 install -m 644 /opt/bilingualreader/package/backend/gateway.py /opt/bilingualreader/app/gateway.py
 install -m 644 /opt/bilingualreader/package/backend/asr.py /opt/bilingualreader/app/asr.py
 install -m 644 /opt/bilingualreader/package/backend/dictionary_lookup.py /opt/bilingualreader/app/dictionary_lookup.py
+install -m 644 /opt/bilingualreader/package/backend/accounts.py /opt/bilingualreader/app/accounts.py
 install -d -m 700 -o readertranslate -g readertranslate /var/lib/bilingualreader/asr
 install -m 644 /opt/bilingualreader/package/deploy/qwen/bilingualreader-asr-cleanup.service /opt/bilingualreader/package/deploy/qwen/bilingualreader-asr-cleanup.timer /etc/systemd/system/
 install -m 644 /opt/bilingualreader/package/deploy/qwen/bilingualreader.service /etc/systemd/system/bilingualreader.service

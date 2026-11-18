@@ -10,6 +10,11 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - asr-data:/var/lib/bilingualreader/asr
+      - account-data:/var/lib/bilingualreader/accounts
+      - book-data:/var/lib/bilingualreader/books
+    environment:
+      ACCOUNT_DB_PATH: /var/lib/bilingualreader/accounts/accounts.sqlite
+      BOOK_STORAGE_PATH: /var/lib/bilingualreader/books
   asr-cleanup:
     build: ../../backend
     restart: unless-stopped
@@ -19,3 +24,5 @@ services:
       - asr-data:/var/lib/bilingualreader/asr
 volumes:
   asr-data:
+  account-data:
+  book-data:

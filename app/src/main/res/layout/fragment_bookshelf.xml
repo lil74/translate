@@ -2,6 +2,11 @@
 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:gravity="center_vertical">
 <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="让故事带你走进另一种语言" android:textSize="13sp" android:textColor="?attr/paletteMuted"/>
 <com.google.android.material.button.MaterialButton android:id="@+id/import_book" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="＋ 导入"/>
+<com.google.android.material.button.MaterialButton android:id="@+id/open_cloud_books" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="☁ 云端书库"/>
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingHorizontal="20dp">
+<TextView android:id="@+id/bookshelf_cloud_status" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:paddingVertical="6dp" android:text="登录后可将本地书籍上传到云端" style="@style/MutedText"/>
+<com.google.android.material.button.MaterialButton android:id="@+id/upload_cloud_book" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="☁ 上传书籍"/>
 </LinearLayout>
 <ProgressBar android:id="@+id/loading" android:layout_width="32dp" android:layout_height="32dp" android:layout_gravity="center"/>
 <TextView android:id="@+id/command_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:text="正在导入…" style="@style/MutedText" android:visibility="gone"/>

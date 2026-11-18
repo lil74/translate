@@ -9,7 +9,9 @@ Group=readertranslate
 WorkingDirectory=/opt/bilingualreader/app
 EnvironmentFile=/opt/bilingualreader/.env
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/bilingualreader/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 --timeout 70 --error-logfile - gateway:application
+Environment=ACCOUNT_DB_PATH=/var/lib/bilingualreader/accounts.sqlite
+Environment=BOOK_STORAGE_PATH=/var/lib/bilingualreader/books
+ExecStart=/opt/bilingualreader/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 1 --threads 4 --timeout 180 --error-logfile - gateway:application
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
