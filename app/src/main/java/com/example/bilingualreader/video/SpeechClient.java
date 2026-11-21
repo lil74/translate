@@ -13,10 +13,15 @@ import java.util.*;
 public final class SpeechClient {
   public interface Progress {void update(String message);}
   private final Context context;
-  private final String base,token;
+  private final String base,token,language;
   private final SharedPreferences prefs;
   public SpeechClient(Context context,String endpoint,String token)throws Exception {
+    this(context,endpoint,token,"en");
+  }
+  public SpeechClient(Context context,String endpoint,String token,String language)throws Exception {
+    if(!"en".equals(language) && !"zh".equals(language))throw new IllegalArgumentException("不支持的语音识别语言");
     this.context=context.getApplicationContext();this.token=token;
+    this.language=language;
     URL address=new URL(endpoint);
     if(!"https".equals(address.getProtocol()) || address.getUserInfo()!=null || address.getQuery()!=null || address.getRef()!=null)
       throw new IllegalArgumentException("语音识别需要 HTTPS 团队服务地址");
@@ -25,7 +30,7 @@ public final class SpeechClient {
     prefs=this.context.getSharedPreferences("video_asr_pending",Context.MODE_PRIVATE);
   }
   public List<SubtitleSegment> recognize(Uri video,Progress progress)throws Exception {
-    String key=base+"|"+video;
+    String key=base+"|"+language+"|"+video;
     String job=null;long offset=0;
     if(key.equals(prefs.getString("key",""))){job=prefs.getString("job",null);offset=prefs.getLong("offset",0);}
     if(job==null){
@@ -76,6 +81,7 @@ public final class SpeechClient {
     try{
       connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(10000);connection.setReadTimeout(65000);
       connection.setRequestProperty("Authorization","Bearer "+token);
+      connection.setRequestProperty("X-Recognition-Language",language);
       if(audio!=null){
         connection.setRequestMethod("POST");connection.setDoOutput(true);connection.setRequestProperty("Content-Type","audio/mp4");
         connection.setFixedLengthStreamingMode(audio.length());

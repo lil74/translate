@@ -131,7 +131,7 @@ public final class ParagraphAdapter extends RecyclerView.Adapter<ParagraphAdapte
         t != null
             && p.getParagraphId().equals(t.getParagraphId())
             && p.getSourceHash().equals(t.getSourceHash())
-            && "en".equals(t.getSourceLanguage())
+            && ("en".equals(t.getSourceLanguage()) || "ko".equals(t.getSourceLanguage()) || "ja".equals(t.getSourceLanguage()))
             && "zh-CN".equals(t.getTargetLanguage());
     boolean hasResult =
         valid

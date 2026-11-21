@@ -10,20 +10,10 @@ public final class VideoProject {
   public final long positionMs;
   public final List<SubtitleSegment> cues;
 
-  public VideoProject(
-      String videoUri,
-      String videoName,
-      String subtitleName,
-      int direction,
-      String translationKey,
-      boolean demo,
-      long positionMs,
-      List<SubtitleSegment> cues) {
-    if (direction < 0
-        || direction > 1
-        || positionMs < 0
-        || cues == null
-        || cues.size() > SubtitleCodec.MAX_CUES) throw new IllegalArgumentException("视频项目数据无效");
+  public VideoProject(String videoUri, String videoName, String subtitleName, int direction,
+      String translationKey, boolean demo, long positionMs, List<SubtitleSegment> cues) {
+    if (direction < 0 || direction > 3 || positionMs < 0 || cues == null || cues.size() > SubtitleCodec.MAX_CUES)
+      throw new IllegalArgumentException("视频项目数据无效");
     Set<String> ids = new HashSet<>();
     long previous = -1;
     for (SubtitleSegment cue : cues) {
@@ -83,4 +73,7 @@ public final class VideoProject {
   public String targetLanguage() {
     return direction == 0 ? "zh-CN" : "en";
   }
+  public int translatedCount() { int count=0; for (SubtitleSegment cue : cues) if (cue.translatedText!=null) count++; return count; }
+  public String sourceLanguage() { return direction==0?"en":direction==1?"zh-CN":direction==2?"ko":"ja"; }
+  public String targetLanguage() { return direction==1 ? "en" : "zh-CN"; }
 }

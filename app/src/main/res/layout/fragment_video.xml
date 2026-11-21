@@ -7,13 +7,19 @@
    <View android:id="@+id/video_subtitle_scrim" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@android:color/transparent" android:visibility="gone" android:clickable="true" android:focusable="true" android:contentDescription="关闭字幕侧栏"/>
    <include layout="@layout/video_subtitle_drawer"/>
   </FrameLayout>
-  <TextView android:id="@+id/video_playback_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:textColor="?attr/palettePrimary" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
-  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingStart="20dp" android:paddingEnd="8dp" android:paddingVertical="8dp">
-   <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-    <TextView android:id="@+id/video_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="视频学习" android:textSize="18sp" android:textStyle="bold" android:textColor="?attr/paletteInk" android:maxLines="1" android:ellipsize="end"/>
-    <TextView android:id="@+id/video_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="?attr/paletteMuted" android:textSize="12sp"/>
-   </LinearLayout>
-   <com.google.android.material.button.MaterialButton android:id="@+id/video_tools" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="字幕工具"/>
+  <TextView android:id="@+id/video_playback_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_soft_subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="提取视频软字幕"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_ocr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="识别并翻译画面英文"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_asr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="无字幕：识别英文语音并翻译"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_asr_chinese" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="无字幕：识别中文语音并生成字幕"/>
+  <TextView android:id="@+id/video_files" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="8dp" android:maxLines="3" android:ellipsize="end" style="@style/MutedText"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_pick" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="选择视频"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_subtitle_pick" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="导入 SRT/VTT"/>
+  </LinearLayout>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+   <Spinner android:id="@+id/video_direction" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:contentDescription="字幕翻译方向" android:saveEnabled="false"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_service" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="翻译服务"/>
   </LinearLayout>
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:gravity="center_vertical">
    <TextView android:id="@+id/video_status" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:maxLines="2" android:ellipsize="end" android:textSize="12sp" android:textColor="?attr/paletteMuted" android:accessibilityLiveRegion="polite"/>

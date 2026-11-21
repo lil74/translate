@@ -55,7 +55,7 @@ Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。首次同步需要下�
 
 ## 团队入口
 
-首页单词联想、中文词典详情和本地词库说明见 [单词搜索交互](docs/C4_DICTIONARY_SEARCH.md)。
+视频内嵌软字幕提取和无字幕中文视频 ASR 说明见 [视频软字幕提取](docs/VIDEO_SOFT_SUBTITLES.md) 与 [中文字幕识别](docs/VIDEO_CHINESE_ASR.md)。
 
 | 说明 | 文件 |
 |---|---|
