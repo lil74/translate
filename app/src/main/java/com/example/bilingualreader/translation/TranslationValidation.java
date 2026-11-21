@@ -29,12 +29,12 @@ public final class TranslationValidation {
 
   public static void validateRequest(TranslationBatchRequest request) throws AppException {
     if (request == null) throw invalid("翻译请求为空");
-    boolean forward = "en".equals(request.getSourceLanguage())
-        && "zh-CN".equals(request.getTargetLanguage());
+    boolean forward = ("en".equals(request.getSourceLanguage()) || "ko".equals(request.getSourceLanguage())
+        || "ja".equals(request.getSourceLanguage())) && "zh-CN".equals(request.getTargetLanguage());
     boolean reverse = "zh-CN".equals(request.getSourceLanguage())
         && "en".equals(request.getTargetLanguage());
     if (!forward && !reverse) {
-      throw new AppException(ErrorCode.UNSUPPORTED_LANGUAGE, "当前仅支持英语与简体中文互译", false);
+      throw new AppException(ErrorCode.UNSUPPORTED_LANGUAGE, "当前支持英语、韩语、日语翻译为简体中文，以及中文翻译为英语", false);
     }
     if (isBlank(request.getTaskId()) || isBlank(request.getRequestId())
         || request.getItems().isEmpty() || request.getItems().size() > 8) {
@@ -52,7 +52,7 @@ public final class TranslationValidation {
       TranslationInput.Context context=item.getContext();
       if(context!=null) {
         int length=context.getText().codePointCount(0,context.getText().length());
-        if(!forward || request.getItems().size()!=1 || !request.getTaskId().startsWith("selection:")
+        if(!"en".equals(request.getSourceLanguage()) || !forward || request.getItems().size()!=1 || !request.getTaskId().startsWith("selection:")
             || length>SelectionContext.MAX_POINTS || context.getStart()<0
             || context.getEnd()<=context.getStart() || context.getEnd()>length)
           throw invalid("选词语境范围无效");

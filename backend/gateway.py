@@ -100,17 +100,18 @@ class Gateway:
         if not isinstance(text, str) or not text.strip() or len(text) > 4000:
             raise ServiceError(400, "单次原文应为 1–4000 个字符")
         chinese = ("zh", "zh-CN", "zh-Hans")
-        forward = value.get("source") == "en" and value.get("target") in chinese
+        source = value.get("source")
+        forward = source in ("en", "ko", "ja") and value.get("target") in chinese
         reverse = value.get("source") in chinese and value.get("target") == "en"
         if not forward and not reverse:
-            raise ServiceError(400, "当前仅支持英语与简体中文互译")
+            raise ServiceError(400, "当前支持英语、韩语、日语翻译为简体中文，以及中文翻译为英语")
         if value.get("format", "text") != "text":
             raise ServiceError(400, "当前仅支持纯文本")
         profile = value.get("profile", "general")
         if profile not in ("general", "subtitle"):
             raise ServiceError(400, "不支持的翻译场景")
         context = value.get("context")
-        if context is not None and profile == "subtitle":
+        if context is not None and (profile == "subtitle" or source != "en"):
             raise ServiceError(400, "字幕翻译不能混用阅读选词语境")
         if context is not None:
             if (not forward or not isinstance(context, dict) or set(context) != {"text", "start", "end"}
@@ -128,9 +129,10 @@ class Gateway:
         if not self.slots.acquire(blocking=False):
             raise ServiceError(429, "翻译服务正在处理其他请求", 3)
         try:
-            options = {"source_lang": "English" if forward else "Chinese",
+            source_name = {"en": "English", "ko": "Korean", "ja": "Japanese", "zh": "Chinese", "zh-CN": "Chinese", "zh-Hans": "Chinese"}[source if forward else "zh"]
+            options = {"source_lang": source_name if forward else "Chinese",
                        "target_lang": "Chinese" if forward else "English",
-                       "domains": self.config.domains if forward else (
+                       "domains": (self.config.domains if source == "en" else "Translate " + source_name + " into natural Simplified Chinese. Preserve meaning, tone, names and paragraph breaks; do not summarize or add commentary.") if forward else (
                            "Translate Chinese into natural English. Preserve meaning, tone, proper "
                            "names, punctuation and paragraph breaks. Do not summarize, invent details "
                            "or add commentary.")}
@@ -176,7 +178,7 @@ class Gateway:
                 return self._reply(start_response, 200, {"status": "ok", "model": self.config.model,
                                                        "selectionContext": True, "subtitleProfile": True,
                                                        "speechRecognition": bool(os.getenv("ASR_PUBLIC_URL")),
-                                                       "directions": ["en:zh", "zh:en"]})
+                                                       "directions": ["en:zh", "ko:zh", "ja:zh", "zh:en"]})
             if path != "/translate":
                 raise ServiceError(404, "接口不存在")
             if method != "POST":

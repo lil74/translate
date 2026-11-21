@@ -100,6 +100,22 @@ public final class VideoViewModel extends ViewModel {
       }); }
     });
   }
+  public void extractSoftSubtitles() {
+    if(busy || project.videoUri==null)return;
+    cancel();long token=generation;Uri video=Uri.parse(project.videoUri);
+    busy=true;message="正在本机读取视频软字幕轨道…";publish();
+    pending=network.submit(()->{
+      try {
+        List<SubtitleSegment> cues=SoftSubtitleExtractor.extract(context,video);
+        main.post(()->{if(cleared || token!=generation)return;
+          project=new VideoProject(project.videoUri,project.videoName,"视频软字幕",project.direction,null,false,project.positionMs,cues);
+          busy=false;message="已提取 "+cues.size()+" 条软字幕，可预览修正后翻译";changed();
+        });
+      }catch(Exception error){main.post(()->{if(cleared || token!=generation)return;
+        busy=false;message=error.getMessage()==null?"软字幕提取失败，请尝试导入 SRT/VTT 字幕":error.getMessage();publish();
+      });}
+    });
+  }
   public void recognize(float top,float bottom) { recognize(top,bottom,null); }
   public Prepared prepareEnglishOcr() throws AppException {
     Prepared current=prepare();
@@ -138,13 +154,22 @@ public final class VideoViewModel extends ViewModel {
     SpeechPrepared(Prepared translation,SpeechClient client){this.translation=translation;this.client=client;}
   }
   public SpeechPrepared prepareSpeech() throws Exception {
+    return prepareSpeech("en");
+  }
+  public SpeechPrepared prepareSpeech(String language) throws Exception {
     Prepared translation=prepareEnglishOcr();
     if(translation.binding.demo || graph.translationConfig==null)
       throw new IllegalArgumentException("语音识别需要真实云端服务，请先关闭模拟模式并配置访问令牌");
     return new SpeechPrepared(translation,new SpeechClient(context,translation.endpoint,
-        graph.translationConfig.tokenForEndpoint(translation.endpoint)));
+        graph.translationConfig.tokenForEndpoint(translation.endpoint),language));
   }
   public void recognizeSpeech(SpeechPrepared prepared) {
+    recognizeSpeech(prepared,true);
+  }
+  public void recognizeChineseSpeech(SpeechPrepared prepared) {
+    recognizeSpeech(prepared,false);
+  }
+  private void recognizeSpeech(SpeechPrepared prepared,boolean translate) {
     if(cleared || busy || project.videoUri==null || prepared.translation.generation!=generation)return;
     cancel();long token=generation;Uri video=Uri.parse(project.videoUri);
     busy=true;recognizingSpeech=true;message="正在准备视频音频…";publish();
@@ -154,10 +179,10 @@ public final class VideoViewModel extends ViewModel {
           if(!cleared && token==generation){message=status;publish();}
         }));
         main.post(()->{if(cleared || token!=generation)return;
-          project=new VideoProject(project.videoUri,project.videoName,"语音识别 ASR",0,null,false,project.positionMs,cues);
-          busy=false;recognizingSpeech=false;message="语音识别完成，正在进入翻译…";changed();
-          Prepared translation=prepared.translation;
-          translate(new Prepared(translation.binding,translation.endpoint,"en","zh-CN",generation,false));
+          project=new VideoProject(project.videoUri,project.videoName,translate?"英文语音识别 ASR":"中文语音识别 ASR",0,null,false,project.positionMs,cues);
+          busy=false;recognizingSpeech=false;
+          message=translate?"语音识别完成，正在进入翻译…":"中文字幕识别完成，共 "+cues.size()+" 条";changed();
+          if(translate){Prepared binding=prepared.translation;translate(new Prepared(binding.binding,binding.endpoint,"en","zh-CN",generation,false));}
         });
       }catch(Exception error){main.post(()->{if(cleared || token!=generation)return;
         busy=false;recognizingSpeech=false;

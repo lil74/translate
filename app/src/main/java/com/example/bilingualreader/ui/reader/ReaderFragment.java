@@ -24,6 +24,7 @@ public final class ReaderFragment extends BaseFragment {
   private PopupMenu translationMenu;
   private ReaderControls controls;
   private ReaderSettings desiredSettings;
+  private String translationSource="en";
 
   public ReaderFragment() {
     super(R.layout.fragment_reader);
@@ -44,6 +45,7 @@ public final class ReaderFragment extends BaseFragment {
   public void onViewCreated(@NonNull View view, @Nullable Bundle state) {
     super.onViewCreated(view, state);
     vm = models().get(ReaderViewModel.class);
+    translationSource=requireContext().getSharedPreferences("reader_translation",0).getString("source","en");
     commands(vm);
     list = view.findViewById(R.id.list);
     layout = new LinearLayoutManager(requireContext());
@@ -300,6 +302,7 @@ public final class ReaderFragment extends BaseFragment {
             vm.cancel();
             return true;
           }
+          if(item.getItemId()==9912){chooseTranslationSource();return true;}
           if (item.getItemId() == R.id.retranslate) {
             remember();
             requestChapterRetranslation();
@@ -322,7 +325,7 @@ public final class ReaderFragment extends BaseFragment {
           .setTitle("翻译当前章节")
           .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
           .setNegativeButton("暂不翻译", null)
-          .setPositiveButton("继续", (dialog, which) -> vm.translate())
+          .setPositiveButton("继续", (dialog, which) -> vm.translate(translationSource))
           .show();
     } else if (config != null && config.needsConsent()) {
       String endpoint = config.endpoint();
@@ -336,11 +339,19 @@ public final class ReaderFragment extends BaseFragment {
                 if (TranslationConfigStore.ONLINE.equals(config.mode())
                     && endpoint.equals(config.endpoint())) {
                   config.consent(endpoint);
-                  vm.translate();
+                  vm.translate(translationSource);
                 }
               })
           .show();
-    } else vm.translate();
+    } else vm.translate(translationSource);
+  }
+  private void chooseTranslationSource(){
+    String[] labels={"英语 → 中文","韩语 → 中文","日语 → 中文"};String[] codes={"en","ko","ja"};
+    int checked=java.util.Arrays.asList(codes).indexOf(translationSource);
+    new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext()).setTitle("本书原文语言")
+        .setSingleChoiceItems(labels,Math.max(0,checked),(dialog,index)->{translationSource=codes[index];
+          requireContext().getSharedPreferences("reader_translation",0).edit().putString("source",translationSource).apply();dialog.dismiss();})
+        .setNegativeButton("取消",null).show();
   }
 
   private void requestChapterRetranslation() {
@@ -356,7 +367,7 @@ public final class ReaderFragment extends BaseFragment {
           UiState<ReaderViewModel.Location> current=vm.location.getValue();
           if(endpoint.equals(config.endpoint()) && mode.equals(config.mode())
               && current!=null && current.data!=null && chapter.equals(current.data.chapter.getChapterId())) {
-            config.consent(endpoint);vm.retranslate();
+            config.consent(endpoint);vm.retranslate(translationSource);
           }
         }).show();
   }
@@ -364,10 +375,11 @@ public final class ReaderFragment extends BaseFragment {
   private void populateTranslationMenu(Menu menu) {
     menu.clear();
     menu.add(0, R.id.task_status, 0, getTranslationStatus()).setEnabled(false);
+    menu.add(0,9912,1,"原文语言："+java.util.Arrays.asList("英语","韩语","日语").get(Math.max(0,java.util.Arrays.asList("en","ko","ja").indexOf(translationSource))));
     UiState<ReaderViewModel.Location> location = vm.location.getValue();
     UiState<String> command = vm.command.getValue();
     boolean busy = command != null && command.status == UiState.Status.LOADING;
-    menu.add(0, R.id.translate, 1, getTranslationAction())
+    menu.add(0, R.id.translate, 2, getTranslationAction())
         .setEnabled(location != null && location.data != null && !isTranslationActive() && !busy);
     if (isTranslationActive()) menu.add(0, R.id.cancel, 2, "取消任务").setEnabled(!busy);
     TranslationTask task=vm.task.getValue();

@@ -190,22 +190,28 @@ public final class ReaderViewModel extends BaseViewModel {
   }
 
   public void translate() {
+    translate("en");
+  }
+  public void translate(String source) {
     String id = chapterId.getValue();
     if (id != null)
       execute(
           () -> {
-            graph.translation.startOrResumeChapter(id, "en", "zh-CN");
+            graph.translation.startOrResumeChapter(id, source, "zh-CN");
             return graph.demo ? "模拟翻译已开始" : "翻译任务已提交";
           });
   }
 
   public void retranslate() {
+    retranslate("en");
+  }
+  public void retranslate(String source) {
     String id=chapterId.getValue();
     if(id!=null)execute(() -> {
       if(!(graph.translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator))
         throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,"当前翻译服务不支持重新翻译",false);
       ((com.example.bilingualreader.translation.WorkTranslationCoordinator)graph.translation)
-          .retranslateChapter(id,"en","zh-CN");
+          .retranslateChapter(id,source,"zh-CN");
       return "已使用当前服务重新翻译本章";
     });
   }

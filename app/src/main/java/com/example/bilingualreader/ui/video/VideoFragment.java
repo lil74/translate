@@ -87,12 +87,14 @@ public final class VideoFragment extends BaseFragment {
     view.findViewById(R.id.video_cancel).setOnClickListener(v -> {closeDialog();vm.cancel();});
     view.findViewById(R.id.video_ocr).setOnClickListener(v -> chooseOcr());
     view.findViewById(R.id.video_asr).setOnClickListener(v -> chooseSpeech());
+    view.findViewById(R.id.video_asr_chinese).setOnClickListener(v -> chooseChineseSpeech());
+    view.findViewById(R.id.video_soft_subtitle).setOnClickListener(v -> extractSoftSubtitles());
     view.findViewById(R.id.video_translate).setOnClickListener(v -> confirmTranslation());
     view.findViewById(R.id.video_export).setOnClickListener(v -> chooseExport());
     view.findViewById(R.id.video_service).setVisibility(graph().translationConfig==null?View.GONE:View.VISIBLE);
     view.findViewById(R.id.video_service).setOnClickListener(v -> TranslationSettingsDialog.show(requireContext(),graph().translationConfig));
     Spinner direction=view.findViewById(R.id.video_direction);
-    direction.setAdapter(new ArrayAdapter<>(requireContext(),android.R.layout.simple_spinner_dropdown_item,new String[]{"英文 → 中文","中文 → 英文"}));
+    direction.setAdapter(new ArrayAdapter<>(requireContext(),android.R.layout.simple_spinner_dropdown_item,new String[]{"英文 → 中文","中文 → 英文","韩语 → 中文","日语 → 中文"}));
     direction.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
       public void onNothingSelected(AdapterView<?> p){}
       public void onItemSelected(AdapterView<?> p,View row,int position,long id){
@@ -126,6 +128,8 @@ public final class VideoFragment extends BaseFragment {
     view.findViewById(R.id.video_pick).setEnabled(!vm.busy);
     view.findViewById(R.id.video_ocr).setEnabled(!vm.busy && p.videoUri!=null);
     view.findViewById(R.id.video_asr).setEnabled(!vm.busy && p.videoUri!=null);
+    view.findViewById(R.id.video_asr_chinese).setEnabled(!vm.busy && p.videoUri!=null);
+    view.findViewById(R.id.video_soft_subtitle).setEnabled(!vm.busy && p.videoUri!=null);
     view.findViewById(R.id.video_subtitle_pick).setEnabled(!vm.busy);
     view.findViewById(R.id.video_translate).setEnabled(!vm.busy && !p.cues.isEmpty());
     ((TextView)view.findViewById(R.id.video_translate)).setText(!p.cues.isEmpty() && p.translatedCount()==p.cues.size()?"重新翻译全部":"翻译 / 继续翻译");
@@ -154,6 +158,14 @@ public final class VideoFragment extends BaseFragment {
           }catch(com.example.bilingualreader.contract.model.AppException error){notice(error.getUserMessage());}
         }).show();
   }
+  private void extractSoftSubtitles(){
+    if(player!=null)player.pause();closeDialog();
+    boolean replacing=!vm.project().cues.isEmpty();
+    dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle(replacing?"替换当前字幕？":"提取视频内嵌软字幕？")
+        .setMessage((replacing?"提取后会替换当前字幕和译文。需要保留时请先导出。":"")
+            +"在本机读取视频内嵌的字幕轨道和时间戳，视频不会上传。")
+        .setNegativeButton("取消",null).setPositiveButton("提取",(d,w)->vm.extractSoftSubtitles()).show();
+  }
   private void chooseSpeech(){
     if(player!=null)player.pause();closeDialog();
     try{
@@ -164,6 +176,19 @@ public final class VideoFragment extends BaseFragment {
               +"语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。成功后会替换当前字幕和译文。"
               +"暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
           .setNegativeButton("取消",null).setPositiveButton("同意并开始",(d,w)->vm.recognizeSpeech(prepared)).show();
+    }catch(Exception error){notice(error instanceof com.example.bilingualreader.contract.model.AppException
+        ?((com.example.bilingualreader.contract.model.AppException)error).getUserMessage():error.getMessage());}
+  }
+  private void chooseChineseSpeech(){
+    if(player!=null)player.pause();closeDialog();
+    try{
+      VideoViewModel.SpeechPrepared prepared=vm.prepareSpeech("zh");
+      dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("上传音频并识别中文语音？")
+          .setMessage("会从视频提取 AAC 音频，发送到 "+prepared.translation.endpoint
+              +" 对应的团队服务器，由阿里云百炼识别为中文字幕。视频画面不上传。"
+              +"语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。识别结果将替换当前字幕。"
+              +"暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
+          .setNegativeButton("取消",null).setPositiveButton("同意并开始",(d,w)->vm.recognizeChineseSpeech(prepared)).show();
     }catch(Exception error){notice(error instanceof com.example.bilingualreader.contract.model.AppException
         ?((com.example.bilingualreader.contract.model.AppException)error).getUserMessage():error.getMessage());}
   }

@@ -12,8 +12,10 @@
    </LinearLayout>
   </FrameLayout>
   <TextView android:id="@+id/video_playback_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_soft_subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="提取视频软字幕"/>
   <com.google.android.material.button.MaterialButton android:id="@+id/video_ocr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="识别并翻译画面英文"/>
   <com.google.android.material.button.MaterialButton android:id="@+id/video_asr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="无字幕：识别英文语音并翻译"/>
+  <com.google.android.material.button.MaterialButton android:id="@+id/video_asr_chinese" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="无字幕：识别中文语音并生成字幕"/>
   <TextView android:id="@+id/video_files" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="8dp" android:maxLines="3" android:ellipsize="end" style="@style/MutedText"/>
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
    <com.google.android.material.button.MaterialButton android:id="@+id/video_pick" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="选择视频"/>

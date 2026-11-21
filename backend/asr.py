@@ -178,6 +178,9 @@ class AsrGateway:
             raise AsrError(503, "服务器尚未配置语音识别公网地址")
         if env.get("CONTENT_TYPE", "").split(";")[0] != "audio/mp4":
             raise AsrError(415, "请上传 M4A 音频")
+        language = env.get("HTTP_X_RECOGNITION_LANGUAGE", "en")
+        if language not in ("en", "zh"):
+            raise AsrError(400, "语音识别语言仅支持 en 或 zh")
         try:
             length = int(env.get("CONTENT_LENGTH", "0"))
         except ValueError:
@@ -187,7 +190,7 @@ class AsrGateway:
         raw = env["wsgi.input"].read(length)
         if len(raw) != length or raw[4:8] != b"ftyp":
             raise AsrError(400, "音频文件格式或长度无效")
-        job_id = hmac.new(self.config.service_token.encode(), raw, hashlib.sha256).hexdigest()[:32]
+        job_id = hmac.new(self.config.service_token.encode(), language.encode() + b"\0" + raw, hashlib.sha256).hexdigest()[:32]
         with self.locked():
             self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
             try:
@@ -212,13 +215,13 @@ class AsrGateway:
                 audio.unlink(missing_ok=True)
                 raise
             url = f"{self.public}/asr/media/{job_id}?sig={self.signature(job_id, expires)}"
-            job = dict(status="PENDING", expires=expires, model=self.model)
+            job = dict(status="PENDING", expires=expires, model=self.model, language=language)
             # Publish metadata first so the vendor may immediately fetch the signed URL.
             self.write(job_id, job)
             try:
                 result = self.vendor("/services/audio/asr/transcription", {
                     "model": self.model, "input": {"file_urls": [url]},
-                    "parameters": {"channel_id": [0], "language_hints": ["en"], "timestamp_alignment_enabled": True}})
+                    "parameters": {"channel_id": [0], "language_hints": [language], "timestamp_alignment_enabled": True}})
                 upstream = result["output"]["task_id"]
                 if not isinstance(upstream, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,100}", upstream):
                     raise AsrError(502, "语音识别任务标识无效")
