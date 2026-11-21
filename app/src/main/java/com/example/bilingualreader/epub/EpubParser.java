@@ -47,32 +47,19 @@ public final class EpubParser {
       String title = first(opf,"title",fallbackTitle), author=authors(opf);
       String language=first(opf,"language","und");
       Map<String,String> manifest=new HashMap<>();
-      Map<String,String> mediaTypes=new HashMap<>();
-      String navPath=null,coverId=null,ncxId=null;
+      String navPath=null,ncxId=null;
       NodeList items=opf.getElementsByTagNameNS("*","item");
       for(int i=0;i<items.getLength();i++) {
         org.w3c.dom.Element item=(org.w3c.dom.Element)items.item(i);
         manifest.put(item.getAttribute("id"),path(base,item.getAttribute("href")));
-        mediaTypes.put(item.getAttribute("id"),item.getAttribute("media-type"));
         Set<String> properties=new HashSet<>(Arrays.asList(item.getAttribute("properties").split("\\s+")));
         if(properties.contains("nav"))navPath=manifest.get(item.getAttribute("id"));
-        if(properties.contains("cover-image"))coverId=item.getAttribute("id");
-      }
-      NodeList metas=opf.getElementsByTagNameNS("*","meta");
-      if(coverId==null)for(int i=0;i<metas.getLength();i++){
-        org.w3c.dom.Element meta=(org.w3c.dom.Element)metas.item(i);
-        if("cover".equalsIgnoreCase(meta.getAttribute("name"))){coverId=meta.getAttribute("content");break;}
       }
       NodeList spines=opf.getElementsByTagNameNS("*","spine");
       if(spines.getLength()>0)ncxId=((org.w3c.dom.Element)spines.item(0)).getAttribute("toc");
-      byte[] cover=null;String coverExtension=null;
-      if(coverId!=null&&manifest.containsKey(coverId)){
-        String type=mediaTypes.get(coverId);
-        if("image/jpeg".equals(type)||"image/png".equals(type)||"image/webp".equals(type)){
-          cover=read(zip,manifest.get(coverId),total);
-          coverExtension="image/jpeg".equals(type)?"jpg":"image/png".equals(type)?"png":"webp";
-        }
-      }
+      EpubCoverExtractor.Cover extracted=EpubCoverExtractor.find(zip,opf,base,encrypted,total);
+      byte[] cover=extracted==null?null:extracted.bytes;
+      String coverExtension=extracted==null?null:extracted.extension;
       List<Chapter> chapters=new ArrayList<>(); List<Paragraph> paragraphs=new ArrayList<>();
       List<TocEntry> toc=new ArrayList<>(); List<String> warnings=new ArrayList<>();
       Map<String,String> anchors=new HashMap<>();
@@ -173,7 +160,7 @@ public final class EpubParser {
     for(Element child:parent.children())if(child.tagName().equals(tag))return child;
     return null;
   }
-  private static Set<String> encryptedResources(ZipFile zip,long[] total)throws Exception{
+  static Set<String> encryptedResources(ZipFile zip,long[] total)throws Exception{
     Set<String> paths=new HashSet<>();
     if(zip.getEntry("META-INF/encryption.xml")==null)return paths;
     Document encryption=xml(read(zip,"META-INF/encryption.xml",total));
@@ -217,13 +204,13 @@ public final class EpubParser {
     try {byte[] digest=MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)); StringBuilder b=new StringBuilder();for(byte x:digest)b.append(String.format(Locale.ROOT,"%02x",x&255));return b.toString();}
     catch(Exception e){throw new IllegalStateException(e);}
   }
-  private static byte[] read(ZipFile zip,String name,long[] total) throws Exception {
+  static byte[] read(ZipFile zip,String name,long[] total) throws Exception {
     ZipEntry entry=zip.getEntry(name); if(entry==null) throw error(ErrorCode.INVALID_EPUB,"缺少 EPUB 资源: "+name);
     try(InputStream in=zip.getInputStream(entry);ByteArrayOutputStream out=new ByteArrayOutputStream()) {
       byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1) {total[0]+=n;if(total[0]>200L*1024*1024||out.size()+n>10*1024*1024)throw error(ErrorCode.EPUB_TOO_LARGE,"EPUB 解压内容超过限制");out.write(buf,0,n);}return out.toByteArray();
     }
   }
-  private static Document xml(byte[] bytes) throws Exception {
+  static Document xml(byte[] bytes) throws Exception {
     // Android's Harmony parser does not support disallow-doctype-decl. Reject DTDs
     // before parsing, then disable external entities wherever the parser supports it.
     String header = new String(bytes, StandardCharsets.ISO_8859_1).toUpperCase(Locale.ROOT);
@@ -248,7 +235,7 @@ public final class EpubParser {
     }
     return names.isEmpty()?"未知作者":String.join("、",names);
   }
-  private static String path(String base,String relative) throws AppException {
+  static String path(String base,String relative) throws AppException {
     String decoded=decode(relative.split("[#?]",2)[0]);
     Deque<String> parts=new ArrayDeque<>();for(String part:(base+decoded).replace('\\','/').split("/")) {if(part.isEmpty()||part.equals("."))continue;if(part.equals("..")){if(parts.isEmpty())throw error(ErrorCode.INVALID_EPUB,"EPUB 路径越界");parts.removeLast();}else parts.addLast(part);}return String.join("/",parts);
   }

@@ -71,6 +71,8 @@ public final class MediaGridAdapter<T> extends RecyclerView.Adapter<MediaGridAda
     ((CoverFrame) holder.itemView.findViewById(R.id.media_cover_frame))
         .ratio(video ? 16f / 9f : 2f / 3f);
     holder.image.setImageDrawable(null);
+    holder.image.setScaleType(
+        video ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
     holder.placeholder.setText(presenter.title(value));
     holder.placeholder.setVisibility(View.VISIBLE);
     ((TextView) holder.itemView.findViewById(R.id.media_title)).setText(presenter.title(value));

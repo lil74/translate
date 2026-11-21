@@ -28,7 +28,7 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
     this.context=context.getApplicationContext();
     db=Room.databaseBuilder(this.context,LibraryDatabase.class,"library.db")
         .addMigrations(LibraryDatabase.MIGRATION_1_2).build();dao=db.dao();
-    new Thread(this::cleanupOrphans,"epub-cleanup").start();
+    new Thread(()->{cleanupOrphans();refreshMissingCovers();},"epub-covers").start();
   }
   public LocalLibraryRepository(Context context, LibraryDatabase database) {
     this.context=context.getApplicationContext(); this.db=database; this.dao=db.dao();
@@ -44,6 +44,35 @@ public final class LocalLibraryRepository implements BookRepository,ReaderReposi
     }catch(RuntimeException e){Log.w("EpubImport","Orphan cleanup failed",e);}
   }
   private static AppException err(ErrorCode code,String message){return new AppException(code,message,false);}
+  /** Background-only upgrade of missing covers; book text, translations and progress stay intact. */
+  public int refreshMissingCovers(){
+    int restored=0;
+    try{
+      for(BookRow candidate:dao.booksForCoverRepair()){
+        if(!candidate.localFilePath.toLowerCase(Locale.ROOT).endsWith(".epub"))continue;
+        synchronized(IMPORT_LOCK){
+          BookRow row=dao.book(candidate.bookId);
+          if(row==null||(row.coverPath!=null&&new File(row.coverPath).isFile()))continue;
+          File temporary=null;
+          try{
+            com.example.bilingualreader.epub.EpubCoverExtractor.Cover cover=
+                com.example.bilingualreader.epub.EpubCoverExtractor.find(new File(row.localFilePath));
+            if(cover==null)continue;
+            File directory=new File(context.getFilesDir(),"covers");
+            if(!directory.isDirectory()&&!directory.mkdirs())continue;
+            temporary=File.createTempFile("cover-",".tmp",directory);
+            try(OutputStream out=new FileOutputStream(temporary)){out.write(cover.bytes);}
+            File target=new File(directory,row.bookId+"."+cover.extension);
+            java.nio.file.Files.move(temporary.toPath(),target.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            if(dao.updateCover(row.bookId,target.getAbsolutePath())==0)target.delete();
+            else restored++;
+          }catch(Exception error){Log.w("EpubImport","Optional cover recovery failed",error);}
+          finally{if(temporary!=null)temporary.delete();}
+        }
+      }
+    }catch(RuntimeException error){Log.w("EpubImport","Cover recovery unavailable",error);}
+    return restored;
+  }
   private String name(Uri uri) {try(Cursor c=context.getContentResolver().query(uri,null,null,null,null)){if(c!=null&&c.moveToFirst()){int col=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(col>=0)return c.getString(col);}}catch(Exception ignored){}String s=uri.getLastPathSegment();return s==null?"Imported book.epub":s;}
   public ImportResult importBook(Uri uri) throws AppException {
     return importBook(uri,null);

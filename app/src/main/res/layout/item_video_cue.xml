@@ -1,0 +1,8 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingVertical="14dp" android:layout_marginVertical="2dp" android:background="@drawable/video_cue_background" android:clickable="true" android:focusable="true">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+  <TextView android:id="@+id/cue_time" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="?attr/paletteMuted" android:textSize="12sp"/>
+  <TextView android:id="@+id/cue_active" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="当前句" android:textColor="?attr/palettePrimary" android:textSize="12sp" android:visibility="gone"/>
+ </LinearLayout>
+ <TextView android:id="@+id/cue_original" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="?attr/paletteInk" android:textSize="17sp" android:lineSpacingMultiplier="1.2"/>
+ <TextView android:id="@+id/cue_translation" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="?attr/paletteMuted" android:textSize="15sp" android:lineSpacingMultiplier="1.2"/>
+</LinearLayout>

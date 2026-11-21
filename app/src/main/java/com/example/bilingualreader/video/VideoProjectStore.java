@@ -45,6 +45,7 @@ public final class VideoProjectStore {
   public VideoProject load(String uri)throws IOException {synchronized(LOCK){migrate();return library.load(uri);}}
   public List<VideoLibrary.Entry> list()throws IOException {synchronized(LOCK){migrate();return library.list();}}
   public VideoProject add(String uri,String name)throws IOException {synchronized(LOCK){migrate();return library.add(uri,name);}}
+  public VideoProject rename(String uri,String name)throws IOException {synchronized(LOCK){migrate();VideoProject updated=library.rename(uri,name);if(uri.equals(read().videoUri))write(updated);return updated;}}
   public void delete(String uri)throws IOException {synchronized(LOCK){library.delete(uri);VideoProject current=read();if(uri.equals(current.videoUri))write(VideoProject.empty());}}
   public void save(VideoProject project) throws IOException { synchronized(LOCK){if(project.videoUri!=null&&!library.save(project))return;write(project);} }
   private void write(VideoProject project) throws IOException {
