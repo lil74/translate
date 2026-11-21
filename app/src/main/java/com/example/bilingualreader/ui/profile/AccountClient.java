@@ -52,17 +52,21 @@ public final class AccountClient {
     prefs.edit().putString("username",name).putString("session",Base64.getEncoder().encodeToString(bytes)).apply();
   }
   JSONObject request(String action,String name,String password)throws Exception {
+    JSONObject body=null;
+    if(!"me".equals(action)&&!"logout".equals(action))body=new JSONObject().put("username",name).put("password",password);
+    return call(action,"me".equals(action)?"GET":"POST",body,"me".equals(action)||"logout".equals(action));
+  }
+  JSONObject call(String action,String method,JSONObject data,boolean authenticated)throws Exception {
     URL url=new URL(endpoint()+"/account/"+action);
     if (!"https".equals(url.getProtocol()) || url.getUserInfo()!=null || url.getQuery()!=null || url.getRef()!=null)
       throw new IOException("请输入 HTTPS 服务器地址");
     HttpURLConnection connection=(HttpURLConnection)url.openConnection();
     connection.setConnectTimeout(10000);connection.setReadTimeout(15000);
     connection.setInstanceFollowRedirects(false);
-    connection.setRequestMethod("me".equals(action)?"GET":"POST");
+    connection.setRequestMethod(method);
     connection.setRequestProperty("Accept","application/json");
-    if ("me".equals(action)||"logout".equals(action)) connection.setRequestProperty("Authorization","Bearer "+token());
-    else {
-      JSONObject data=new JSONObject();data.put("username",name);data.put("password",password);
+    if(authenticated) connection.setRequestProperty("Authorization","Bearer "+token());
+    if(data!=null){
       byte[] body=data.toString().getBytes(StandardCharsets.UTF_8);
       connection.setRequestProperty("Content-Type","application/json");
       connection.setDoOutput(true);
@@ -73,7 +77,7 @@ public final class AccountClient {
       InputStream stream=code<400?connection.getInputStream():connection.getErrorStream();
       if(stream==null)throw new IOException("服务器没有响应");
       ByteArrayOutputStream buffer=new ByteArrayOutputStream();
-      try(InputStream in=stream){byte[] chunk=new byte[1024];int n;while((n=in.read(chunk))!=-1){buffer.write(chunk,0,n);if(buffer.size()>8192)throw new IOException("服务器响应过大");}}
+      try(InputStream in=stream){byte[] chunk=new byte[4096];int n;while((n=in.read(chunk))!=-1){buffer.write(chunk,0,n);if(buffer.size()>2*1024*1024)throw new IOException("服务器响应过大");}}
       JSONObject result=new JSONObject(buffer.toString("UTF-8"));
       if(code>=400)throw new IOException(result.optString("error","账号请求失败"));
       if("login".equals(action)||"register".equals(action)) save(result.getString("username"),result.getString("token"));

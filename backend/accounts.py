@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import tempfile
 import time
@@ -40,7 +41,8 @@ class Accounts:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE,
-                    salt BLOB NOT NULL, password_hash BLOB NOT NULL, created_at INTEGER NOT NULL);
+                    salt BLOB NOT NULL, password_hash BLOB NOT NULL, created_at INTEGER NOT NULL,
+                    recovery_hash BLOB);
                 CREATE TABLE IF NOT EXISTS sessions (
                     token_hash BLOB PRIMARY KEY, user_id INTEGER NOT NULL,
                     expires_at INTEGER NOT NULL,
@@ -59,6 +61,8 @@ class Accounts:
                     PRIMARY KEY(user_id,expression_id),
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
             """)
+            if "recovery_hash" not in {row[1] for row in db.execute("PRAGMA table_info(users)")}:
+                db.execute("ALTER TABLE users ADD COLUMN recovery_hash BLOB")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=10)
@@ -214,6 +218,86 @@ class Accounts:
             return reply(start, 200 if deleted else 404, {"deleted": bool(deleted)} if deleted else {"error": "收藏不存在"})
         return reply(start, 405 if path == "/expressions" or match else 404, {"error": "收藏接口不存在"})
 
+    def _manage(self, env, start):
+        path, method = env.get("PATH_INFO"), env.get("REQUEST_METHOD")
+        expected = {"/account/export": "GET", "/account/password": "POST",
+                    "/account/recovery-code": "POST", "/account/recover": "POST",
+                    "/account/me": "DELETE"}
+        if method != expected[path]:
+            return reply(start, 405, {"error": "请求方法不正确"})
+        value = {}
+        if method != "GET":
+            if env.get("CONTENT_TYPE", "").split(";")[0].lower() != "application/json":
+                return reply(start, 415, {"error": "请使用 JSON 请求"})
+            try:
+                length = int(env.get("CONTENT_LENGTH", "0"))
+                if length < 1 or length > MAX_BODY:
+                    return reply(start, 413, {"error": "请求大小无效"})
+                value = json.loads(env["wsgi.input"].read(length))
+                if not isinstance(value, dict):
+                    raise ValueError()
+            except (ValueError, TypeError, UnicodeError, KeyError):
+                return reply(start, 400, {"error": "请求内容无效"})
+        if path == "/account/recover":
+            username, code, password = value.get("username"), value.get("recoveryCode"), value.get("newPassword")
+            if (not isinstance(username, str) or not USERNAME.fullmatch(username)
+                    or not isinstance(code, str) or not re.fullmatch(r"[0-9a-f]{40}", code)
+                    or not isinstance(password, str) or not 10 <= len(password) <= 128):
+                return reply(start, 400, {"error": "恢复信息格式无效"})
+            with closing(self._connect()) as db, db:
+                client = (env.get("HTTP_X_REAL_IP") or env.get("REMOTE_ADDR", "unknown"))[:64]
+                now = int(time.time())
+                db.execute("DELETE FROM attempts WHERE at<?", (now - 900,))
+                count = db.execute("SELECT COUNT(*) FROM attempts WHERE client=? AND at>=?", (client, now - 900)).fetchone()[0]
+                if count >= 20:
+                    return reply(start, 429, {"error": "尝试次数过多，请稍后再试"})
+                db.execute("INSERT INTO attempts(client,at) VALUES(?,?)", (client, now))
+                row = db.execute("SELECT id,recovery_hash FROM users WHERE username=?", (username,)).fetchone()
+                digest = hashlib.sha256(code.encode("ascii")).digest()
+                if not hmac.compare_digest(digest, row[1] if row and row[1] else b"\0" * 32):
+                    return reply(start, 401, {"error": "用户名或恢复码无效"})
+                salt = secrets.token_bytes(16)
+                db.execute("UPDATE users SET salt=?,password_hash=?,recovery_hash=NULL WHERE id=?",
+                           (salt, self._hash(password, salt), row[0]))
+                db.execute("DELETE FROM sessions WHERE user_id=?", (row[0],))
+            return reply(start, 200, {"ok": True})
+        user, _ = self._user(env)
+        if user is None:
+            return reply(start, 401, {"error": "请重新登录"})
+        if path == "/account/export":
+            with closing(self._connect()) as db:
+                books = db.execute("SELECT book_id,name,size,created_at FROM books WHERE user_id=? ORDER BY created_at DESC", (user[0],)).fetchall()
+                expressions = db.execute("SELECT text,created_at FROM expressions WHERE user_id=? ORDER BY created_at DESC", (user[0],)).fetchall()
+            return reply(start, 200, {"username": user[1], "books": [
+                {"id": row[0], "name": row[1], "size": row[2], "createdAt": row[3]} for row in books],
+                "expressions": [{"text": row[0], "createdAt": row[1]} for row in expressions]})
+        password = value.get("password")
+        if not isinstance(password, str):
+            return reply(start, 400, {"error": "请输入当前密码"})
+        with closing(self._connect()) as db, db:
+            row = db.execute("SELECT salt,password_hash FROM users WHERE id=?", (user[0],)).fetchone()
+            if row is None or not hmac.compare_digest(self._hash(password, row[0]), row[1]):
+                return reply(start, 401, {"error": "当前密码错误"})
+            if path == "/account/recovery-code":
+                code = secrets.token_hex(20)
+                db.execute("UPDATE users SET recovery_hash=? WHERE id=?",
+                           (hashlib.sha256(code.encode("ascii")).digest(), user[0]))
+                return reply(start, 200, {"recoveryCode": code})
+            if path == "/account/password":
+                new_password = value.get("newPassword")
+                if not isinstance(new_password, str) or not 10 <= len(new_password) <= 128:
+                    return reply(start, 400, {"error": "新密码需为 10–128 位"})
+                salt = secrets.token_bytes(16)
+                db.execute("UPDATE users SET salt=?,password_hash=?,recovery_hash=NULL WHERE id=?",
+                           (salt, self._hash(new_password, salt), user[0]))
+                db.execute("DELETE FROM sessions WHERE user_id=?", (user[0],))
+                return reply(start, 200, {"ok": True})
+            db.execute("DELETE FROM users WHERE id=?", (user[0],))
+        folder = os.path.join(self.book_dir, str(user[0]))
+        if os.path.isdir(folder):
+            shutil.rmtree(folder)
+        return reply(start, 200, {"deleted": True})
+
     def __call__(self, env, start):
         path, method = env.get("PATH_INFO"), env.get("REQUEST_METHOD")
         if path == "/books" or (path or "").startswith("/books/"):
@@ -226,6 +310,11 @@ class Accounts:
                 return self._expressions(env, start)
             except (OSError, sqlite3.Error):
                 return reply(start, 500, {"error": "云端收藏暂时不可用"})
+        if path in ("/account/export", "/account/password", "/account/recovery-code", "/account/recover") or (path == "/account/me" and method == "DELETE"):
+            try:
+                return self._manage(env, start)
+            except (OSError, sqlite3.Error):
+                return reply(start, 500, {"error": "账号服务暂时不可用"})
         if path not in ("/account/register", "/account/login", "/account/me", "/account/logout"):
             return reply(start, 404, {"error": "接口不存在"})
         if method != ("GET" if path.endswith("/me") else "POST"):
@@ -260,9 +349,11 @@ class Accounts:
                 db.execute("INSERT INTO attempts(client,at) VALUES(?,?)", (client, now))
                 if path.endswith("/register"):
                     salt = secrets.token_bytes(16)
+                    recovery_code = secrets.token_hex(20)
+                    recovery_hash = hashlib.sha256(recovery_code.encode("ascii")).digest()
                     try:
-                        db.execute("INSERT INTO users(username,salt,password_hash,created_at) VALUES(?,?,?,?)",
-                                   (username, salt, self._hash(password, salt), int(time.time())))
+                        db.execute("INSERT INTO users(username,salt,password_hash,created_at,recovery_hash) VALUES(?,?,?,?,?)",
+                                   (username, salt, self._hash(password, salt), int(time.time()), recovery_hash))
                     except sqlite3.IntegrityError:
                         return reply(start, 409, {"error": "用户名已存在"})
                 else:
@@ -275,8 +366,10 @@ class Accounts:
                 token = secrets.token_hex(32)
                 db.execute("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
                            (hashlib.sha256(token.encode("ascii")).digest(), user_id, int(time.time()) + SESSION_SECONDS))
-            return reply(start, 200 if path.endswith("/login") else 201,
-                         {"username": username, "token": token, "expiresIn": SESSION_SECONDS})
+            result = {"username": username, "token": token, "expiresIn": SESSION_SECONDS}
+            if path.endswith("/register"):
+                result["recoveryCode"] = recovery_code
+            return reply(start, 200 if path.endswith("/login") else 201, result)
         except (ValueError, TypeError, KeyError, AttributeError, UnicodeError):
             return reply(start, 400, {"error": "请求内容无效"})
         except Exception:
