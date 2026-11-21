@@ -1,0 +1,19 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent">
+ <LinearLayout android:id="@+id/video_fullscreen_top" android:layout_width="match_parent" android:layout_height="64dp" android:gravity="center_vertical" android:background="@drawable/video_controls_top" android:paddingHorizontal="12dp" android:visibility="gone">
+  <ImageButton android:id="@+id/video_exit_fullscreen" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/video_back_white" android:contentDescription="退出全屏"/>
+  <TextView android:id="@+id/video_fullscreen_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="17sp" android:maxLines="1" android:ellipsize="end" android:layout_marginStart="8dp"/>
+ </LinearLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="vertical" android:paddingHorizontal="12dp" android:paddingTop="16dp" android:background="@drawable/video_controls_bottom">
+  <androidx.media3.ui.DefaultTimeBar android:id="@id/exo_progress" android:layout_width="match_parent" android:layout_height="24dp" app:played_color="#FFFFFF" app:scrubber_color="#FFFFFF" app:buffered_color="#99FFFFFF" app:unplayed_color="#55FFFFFF"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical">
+   <ImageButton android:id="@id/exo_play_pause" android:layout_width="48dp" android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_media_play" android:contentDescription="播放或暂停"/>
+   <TextView android:id="@id/exo_position" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="00:00" android:textColor="#FFFFFF" android:textSize="12sp"/>
+   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" / " android:textColor="#CCFFFFFF" android:textSize="12sp"/>
+   <TextView android:id="@id/exo_duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="00:00" android:textColor="#CCFFFFFF" android:textSize="12sp"/>
+   <Space android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp"/>
+   <TextView android:id="@+id/video_player_subtitles" style="@style/VideoOverlayButton" android:text="字幕"/>
+   <TextView android:id="@+id/video_speed" style="@style/VideoOverlayButton" android:text="1.0×" android:contentDescription="调整播放速度"/>
+   <TextView android:id="@+id/video_fullscreen" style="@style/VideoOverlayButton" android:text="全屏"/>
+  </LinearLayout>
+ </LinearLayout>
+</FrameLayout>

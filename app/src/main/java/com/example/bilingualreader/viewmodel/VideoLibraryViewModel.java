@@ -24,10 +24,15 @@ public final class VideoLibraryViewModel extends ViewModel {
   }
 
   public void add(String uri, String name) {
+    add(uri, name, null);
+  }
+
+  public void add(String uri, String name, String customName) {
     run(
         () -> {
           boolean exists = store.list().stream().anyMatch(e -> e.uri.equals(uri));
           store.add(uri, name);
+          if (customName != null && !customName.trim().isEmpty()) store.rename(uri, customName);
           return exists ? "视频已在库中" : "视频已导入";
         });
   }

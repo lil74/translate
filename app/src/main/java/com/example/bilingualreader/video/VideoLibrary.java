@@ -71,6 +71,14 @@ public final class VideoLibrary {
     }
   }
 
+  public VideoProject rename(String uri, String name) throws IOException {
+    synchronized (LOCK) {
+      VideoProject project = load(uri).named(name);
+      save(project);
+      return project;
+    }
+  }
+
   public boolean save(VideoProject project) throws IOException {
     synchronized (LOCK) {
       if (project.videoUri == null) return false;

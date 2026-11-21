@@ -12,6 +12,30 @@ import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
 public class VideoLibraryTest {
+  @Test
+  public void customNamePersistsWithoutChangingLearningData() throws Exception {
+    VideoProject original = project("content://video/named", 321, "Original subtitle");
+    library.save(original);
+    library.rename(original.videoUri, "  我的英语练习  ");
+    VideoProject restored = new VideoLibrary(directory).load(original.videoUri);
+    assertEquals("我的英语练习", restored.videoName);
+    assertEquals(321, restored.positionMs);
+    assertEquals(original.subtitleName, restored.subtitleName);
+    assertEquals(original.cues.get(0).translatedText, restored.cues.get(0).translatedText);
+    assertEquals("我的英语练习", library.list().get(0).name);
+  }
+
+  @Test
+  public void invalidCustomNameDoesNotReplaceSavedProject() throws Exception {
+    library.add("content://video/unchanged", "Original.mp4");
+    try {
+      library.rename("content://video/unchanged", "   ");
+      fail();
+    } catch (IllegalArgumentException expected) {
+    }
+    assertEquals("Original.mp4", library.load("content://video/unchanged").videoName);
+  }
+
   @Rule public TemporaryFolder temporary = new TemporaryFolder();
   private File directory;
   private VideoLibrary library;

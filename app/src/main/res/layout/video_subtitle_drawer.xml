@@ -1,0 +1,32 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/video_subtitle_drawer" android:layout_width="280dp" android:layout_height="match_parent" android:layout_gravity="end" android:orientation="vertical" android:background="@drawable/video_subtitle_glass" android:paddingHorizontal="12dp" android:visibility="gone" android:clickable="true">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical">
+  <TextView android:id="@+id/video_drawer_count" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="字幕" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold"/>
+  <TextView android:id="@+id/video_drawer_close" style="@style/VideoOverlayButton" android:text="关闭"/>
+ </LinearLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="48dp">
+  <TextView android:id="@+id/video_drawer_list_tab" style="@style/VideoOverlayButton" android:layout_width="0dp" android:layout_weight="1" android:text="字幕列表"/>
+  <TextView android:id="@+id/video_drawer_style_tab" style="@style/VideoOverlayButton" android:layout_width="0dp" android:layout_weight="1" android:text="显示设置"/>
+ </LinearLayout>
+ <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+  <androidx.recyclerview.widget.RecyclerView android:id="@+id/video_drawer_cues" android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false" android:paddingBottom="16dp"/>
+  <TextView android:id="@+id/video_drawer_empty" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="暂无字幕" android:textColor="#DDE3E8" android:visibility="gone"/>
+  <ScrollView android:id="@+id/video_drawer_style" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone">
+   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingVertical="12dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="画面字幕大小" android:textColor="#FFFFFF"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center_vertical">
+     <TextView android:id="@+id/video_caption_smaller" style="@style/VideoOverlayButton" android:text="A−" android:contentDescription="减小字幕字号"/>
+     <TextView android:id="@+id/video_caption_size" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:gravity="center" android:textColor="#FFFFFF"/>
+     <TextView android:id="@+id/video_caption_larger" style="@style/VideoOverlayButton" android:text="A+" android:contentDescription="增大字幕字号"/>
+    </LinearLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="画面字幕位置" android:textColor="#FFFFFF"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp">
+     <TextView android:id="@+id/video_caption_top" style="@style/VideoOverlayButton" android:layout_width="0dp" android:layout_weight="1" android:text="上方"/>
+     <TextView android:id="@+id/video_caption_middle" style="@style/VideoOverlayButton" android:layout_width="0dp" android:layout_weight="1" android:text="居中"/>
+     <TextView android:id="@+id/video_caption_bottom" style="@style/VideoOverlayButton" android:layout_width="0dp" android:layout_weight="1" android:text="下方"/>
+    </LinearLayout>
+    <TextView android:id="@+id/video_drawer_hide" style="@style/VideoOverlayButton" android:layout_width="match_parent" android:gravity="start|center_vertical" android:text="隐藏译文"/>
+    <TextView android:id="@+id/video_drawer_loop" style="@style/VideoOverlayButton" android:layout_width="match_parent" android:gravity="start|center_vertical" android:text="单句循环：关"/>
+   </LinearLayout>
+  </ScrollView>
+ </FrameLayout>
+</LinearLayout>

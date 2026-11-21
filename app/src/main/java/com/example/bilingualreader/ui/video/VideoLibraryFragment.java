@@ -31,7 +31,7 @@ public final class VideoLibraryFragment extends BaseFragment {
               requireContext()
                   .getContentResolver()
                   .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-              vm.add(uri.toString(), name(uri));
+              VideoNameDialog.show(this, uri.toString(), name(uri));
             } catch (SecurityException error) {
               Toast.makeText(requireContext(), "无法保留访问授权，请选择本机视频文件", Toast.LENGTH_LONG).show();
             }
@@ -54,6 +54,15 @@ public final class VideoLibraryFragment extends BaseFragment {
                   }
                 })
             .get(VideoLibraryViewModel.class);
+    getChildFragmentManager()
+        .setFragmentResultListener(
+            VideoNameDialog.RESULT,
+            getViewLifecycleOwner(),
+            (key, result) ->
+                vm.add(
+                    result.getString("uri"),
+                    result.getString("filename"),
+                    result.getString("customName")));
     adapter =
         new MediaGridAdapter<>(
             new MediaGridAdapter.Presenter<VideoLibrary.Entry>() {
