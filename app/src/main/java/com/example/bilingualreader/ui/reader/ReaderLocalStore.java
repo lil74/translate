@@ -24,6 +24,28 @@ public final class ReaderLocalStore {
     prefs.edit().putBoolean("favorite:" + book, value).apply();
   }
 
+  public java.util.List<String> expressions() {
+    java.util.List<String> rows = new java.util.ArrayList<>();
+    try {
+      JSONArray array = new JSONArray(prefs.getString("expressions", "[]"));
+      for (int i = 0; i < array.length(); i++) rows.add(array.getString(i));
+    } catch (JSONException ignored) {}
+    return rows;
+  }
+
+  public void saveExpression(String expression) {
+    java.util.List<String> rows = expressions();
+    if (expression == null || expression.trim().isEmpty() || rows.contains(expression)) return;
+    rows.add(0, expression);
+    prefs.edit().putString("expressions", new JSONArray(rows).toString()).apply();
+  }
+
+  public void removeExpression(String expression) {
+    java.util.List<String> rows = expressions();
+    rows.remove(expression);
+    prefs.edit().putString("expressions", new JSONArray(rows).toString()).apply();
+  }
+
   public static final class Bookmark {
     public final String chapter, paragraph, title, excerpt;
     public final int offset;

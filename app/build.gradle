@@ -8,6 +8,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0'
+        buildConfigField 'String', 'ACCOUNT_BASE_URL', '"https://8.148.28.233"'
         testInstrumentationRunner providers.gradleProperty('androidTestRunner').getOrElse('androidx.test.runner.AndroidJUnitRunner')
     }
     buildTypes {

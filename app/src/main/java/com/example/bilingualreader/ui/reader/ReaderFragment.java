@@ -47,6 +47,19 @@ public final class ReaderFragment extends BaseFragment {
     vm = models().get(ReaderViewModel.class);
     translationSource=requireContext().getSharedPreferences("reader_translation",0).getString("source","en");
     commands(vm);
+    if (!requireArguments().containsKey("tocResultKey"))
+      requireArguments().putString("tocResultKey", "toc:" + java.util.UUID.randomUUID());
+    String tocResultKey = requireArguments().getString("tocResultKey");
+    getParentFragmentManager()
+        .setFragmentResultListener(
+            tocResultKey,
+            getViewLifecycleOwner(),
+            (key, result) -> {
+              String chapter = result.getString("chapter");
+              if (chapter != null)
+                vm.openAt(
+                    requireArguments().getString("book"), chapter, result.getString("paragraph"));
+            });
     list = view.findViewById(R.id.list);
     layout = new LinearLayoutManager(requireContext());
     adapter = new ParagraphAdapter();
@@ -154,6 +167,12 @@ public final class ReaderFragment extends BaseFragment {
                 viewport == null ? s.data.offset : vm.getViewportOffset(list.getWidth());
             restorePending = true;
             restoreViewport = viewport != null;
+            if (requireArguments().containsKey("bookmarkOffset")) {
+              restoreViewport = false;
+              restoreId = s.data.paragraphId;
+              restoreOffset = requireArguments().getInt("bookmarkOffset");
+              requireArguments().remove("bookmarkOffset");
+            }
           }
           view.findViewById(R.id.previous).setEnabled(vm.canMove(-1));
           view.findViewById(R.id.next).setEnabled(vm.canMove(1));
@@ -214,11 +233,12 @@ public final class ReaderFragment extends BaseFragment {
             v -> {
               remember();
               vm.flushProgress();
-              if (!getParentFragmentManager().popBackStackImmediate())
-                host()
-                    .openToc(
-                        requireArguments().getString("book"),
-                        requireArguments().getString("title"));
+              if (controls != null) controls.hide();
+              host()
+                  .openToc(
+                      requireArguments().getString("book"),
+                      requireArguments().getString("title"),
+                      tocResultKey);
             });
     vm.open(
         requireArguments().getString("book"),
@@ -355,10 +375,12 @@ public final class ReaderFragment extends BaseFragment {
   }
 
   private void requestChapterRetranslation() {
-    TranslationConfigStore config=graph().translationConfig;
-    UiState<ReaderViewModel.Location> location=vm.location.getValue();
-    if(config==null || location==null || location.data==null)return;
-    String chapter=location.data.chapter.getChapterId(),endpoint=config.endpoint(),mode=config.mode();
+    TranslationConfigStore config = graph().translationConfig;
+    UiState<ReaderViewModel.Location> location = vm.location.getValue();
+    if (config == null || location == null || location.data == null) return;
+    String chapter = location.data.chapter.getChapterId(),
+        endpoint = config.endpoint(),
+        mode = config.mode();
     new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
         .setTitle(R.string.reader_retranslate_action)
         .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
@@ -382,11 +404,15 @@ public final class ReaderFragment extends BaseFragment {
     menu.add(0, R.id.translate, 2, getTranslationAction())
         .setEnabled(location != null && location.data != null && !isTranslationActive() && !busy);
     if (isTranslationActive()) menu.add(0, R.id.cancel, 2, "取消任务").setEnabled(!busy);
-    TranslationTask task=vm.task.getValue();
-    if(!isTranslationActive() && task!=null && task.getSuccessCount()>0 && graph().translationConfig!=null
-        && graph().translation instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator)
-      menu.add(0,R.id.retranslate,3,R.string.reader_retranslate_action)
-          .setEnabled(location!=null && location.data!=null && !busy);
+    TranslationTask task = vm.task.getValue();
+    if (!isTranslationActive()
+        && task != null
+        && task.getSuccessCount() > 0
+        && graph().translationConfig != null
+        && graph().translation
+            instanceof com.example.bilingualreader.translation.WorkTranslationCoordinator)
+      menu.add(0, R.id.retranslate, 3, R.string.reader_retranslate_action)
+          .setEnabled(location != null && location.data != null && !busy);
   }
 
   private void refreshTranslationMenu() {
@@ -443,6 +469,7 @@ public final class ReaderFragment extends BaseFragment {
         (double) (list.getPaddingTop() - layout.getDecoratedTop(row))
             / Math.max(1, layout.getDecoratedMeasuredHeight(row));
     int percent = vm.readingPercent(first, hidden, !list.canScrollVertically(1));
+    lastReadingPercent = percent;
     progress.setText(percent + "%");
     progress.setContentDescription("全书阅读进度 " + percent + "%");
   }
@@ -469,6 +496,12 @@ public final class ReaderFragment extends BaseFragment {
   public void onPause() {
     remember();
     if (vm != null) vm.flushProgress();
+    if (lastReadingPercent >= 0)
+      new ReaderLocalStore(requireContext())
+          .preferences()
+          .edit()
+          .putInt("progress:" + bookId(), lastReadingPercent)
+          .apply();
     requireActivity().findViewById(R.id.toolbar).setVisibility(View.VISIBLE);
     WindowManager.LayoutParams attrs = requireActivity().getWindow().getAttributes();
     attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;

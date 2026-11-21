@@ -1,0 +1,16 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+<TextView style="@style/HomeHeading" android:text="主题配色"/>
+<RadioGroup android:id="@+id/palette_choices" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+<RadioButton android:id="@+id/palette_green" android:drawableEnd="@drawable/palette_swatch_green" android:paddingEnd="12dp" android:layout_width="match_parent" android:layout_height="64dp" android:text="苔绿" android:textSize="17sp"/>
+<RadioButton android:id="@+id/palette_blue" android:drawableEnd="@drawable/palette_swatch_blue" android:paddingEnd="12dp" android:layout_width="match_parent" android:layout_height="64dp" android:text="雾蓝" android:textSize="17sp"/>
+<RadioButton android:id="@+id/palette_brown" android:drawableEnd="@drawable/palette_swatch_brown" android:paddingEnd="12dp" android:layout_width="match_parent" android:layout_height="64dp" android:text="暖棕" android:textSize="17sp"/>
+</RadioGroup>
+<com.google.android.material.card.MaterialCardView style="@style/HomeCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="20dp" android:orientation="vertical">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="当前主题" android:textSize="18sp" android:textStyle="bold"/>
+<TextView android:id="@+id/palette_preview_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textSize="16sp" android:textColor="?attr/palettePrimary"/>
+<View android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="16dp" android:background="?attr/palettePrimary"/>
+</LinearLayout></com.google.android.material.card.MaterialCardView>
+<TextView style="@style/HomeHeading" android:text="其他设置"/>
+<TextView android:id="@+id/app_translation_service" style="@style/HomeRow" android:text="翻译服务　›"/>
+<TextView android:id="@+id/app_about" style="@style/HomeRow" android:text="关于轻阅　›"/>
+</LinearLayout></ScrollView>

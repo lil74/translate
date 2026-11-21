@@ -1,15 +1,11 @@
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
- <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
-  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="视频学习 · 英文画面识别" android:textSize="20sp" android:textStyle="bold"/>
-  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="画面有英文可选 OCR；没有字幕可识别英文语音。语音识别需联网上传音频，画面不上传。初版支持 10 分钟内视频，请保持前台运行。" android:paddingVertical="8dp" style="@style/MutedText"/>
-  <FrameLayout android:id="@+id/video_stage" android:layout_width="match_parent" android:layout_height="220dp" android:background="#000000">
-   <androidx.media3.ui.PlayerView android:id="@+id/video_player" android:layout_width="match_parent" android:layout_height="match_parent"/>
-   <TextView android:id="@+id/video_caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:layout_marginBottom="56dp" android:gravity="center" android:padding="6dp" android:textColor="#FFFFFF" android:background="#99000000" android:textSize="16sp" android:visibility="gone" android:importantForAccessibility="no"/>
-   <LinearLayout android:layout_width="wrap_content" android:layout_height="48dp" android:layout_gravity="bottom|end" android:background="#99000000">
-    <TextView android:id="@+id/video_speed" android:layout_width="72dp" android:layout_height="48dp" android:gravity="center" android:text="1.0×" android:textColor="#FFFFFF" android:clickable="true" android:focusable="true" android:contentDescription="调整播放速度"/>
-    <TextView android:id="@+id/video_fullscreen" android:layout_width="64dp" android:layout_height="48dp" android:gravity="center" android:text="全屏" android:textColor="#FFFFFF" android:clickable="true" android:focusable="true" android:contentDescription="横屏全屏播放"/>
-   </LinearLayout>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/video_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="?attr/paletteBackground">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+  <FrameLayout android:id="@+id/video_stage" android:layout_width="match_parent" android:layout_height="210dp" android:background="#000000">
+   <androidx.media3.ui.PlayerView app:controller_layout_id="@layout/video_player_controls" android:id="@+id/video_player" android:layout_width="match_parent" android:layout_height="match_parent"/>
+   <TextView android:id="@+id/video_caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:layout_marginBottom="56dp" android:gravity="center" android:padding="8dp" android:textColor="#FFFFFF" android:background="#99000000" android:textSize="16sp" android:visibility="gone" android:importantForAccessibility="no"/>
+
+   <View android:id="@+id/video_subtitle_scrim" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@android:color/transparent" android:visibility="gone" android:clickable="true" android:focusable="true" android:contentDescription="关闭字幕侧栏"/>
+   <include layout="@layout/video_subtitle_drawer"/>
   </FrameLayout>
   <TextView android:id="@+id/video_playback_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/primary" android:visibility="gone" android:accessibilityLiveRegion="polite"/>
   <com.google.android.material.button.MaterialButton android:id="@+id/video_soft_subtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="提取视频软字幕"/>
@@ -25,17 +21,53 @@
    <Spinner android:id="@+id/video_direction" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:contentDescription="字幕翻译方向" android:saveEnabled="false"/>
    <com.google.android.material.button.MaterialButton android:id="@+id/video_service" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="翻译服务"/>
   </LinearLayout>
-  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-   <com.google.android.material.button.MaterialButton android:id="@+id/video_translate" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="翻译 / 继续翻译"/>
-   <com.google.android.material.button.MaterialButton android:id="@+id/video_cancel" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="取消处理"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:gravity="center_vertical">
+   <TextView android:id="@+id/video_status" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:maxLines="2" android:ellipsize="end" android:textSize="12sp" android:textColor="?attr/paletteMuted" android:accessibilityLiveRegion="polite"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_cancel" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="取消处理" android:visibility="gone"/>
   </LinearLayout>
-  <ProgressBar android:id="@+id/video_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:max="1000"/>
-  <TextView android:id="@+id/video_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="8dp" android:accessibilityLiveRegion="polite"/>
-  <TextView android:id="@+id/video_demo" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="模拟译文，非真实翻译（导出同样标记）" android:textColor="@color/primary" android:visibility="gone"/>
-  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-   <com.google.android.material.button.MaterialButton android:id="@+id/video_export" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="导出字幕"/>
+  <ProgressBar android:id="@+id/video_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="1000" android:visibility="gone"/>
+  <TextView android:id="@+id/video_demo" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="20dp" android:text="模拟译文，非真实翻译" android:textSize="12sp" android:textColor="?attr/palettePrimary" android:visibility="gone"/>
+  <LinearLayout android:id="@+id/video_learning_controls" android:layout_width="match_parent" android:layout_height="48dp" android:paddingHorizontal="12dp" android:gravity="center_vertical" android:visibility="gone">
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_hide_translation" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:text="隐藏译文" android:textSize="12sp" android:paddingHorizontal="4dp"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_follow" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:text="跟随播放" android:textSize="12sp" android:paddingHorizontal="4dp"/>
+   <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/video_loop" android:layout_width="wrap_content" android:layout_height="48dp" android:layout_marginStart="8dp" android:text="单句循环" android:textSize="12sp"/>
   </LinearLayout>
-  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="点击一条字幕单句播放 · 长按修正原文" style="@style/MutedText"/>
-  <androidx.recyclerview.widget.RecyclerView android:id="@+id/video_cues" android:layout_width="match_parent" android:layout_height="360dp"/>
+  <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+   <androidx.recyclerview.widget.RecyclerView android:id="@+id/video_cues" android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false" android:paddingHorizontal="8dp" android:paddingBottom="24dp"/>
+   <ScrollView android:id="@+id/video_preparation" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="24dp" android:paddingVertical="20dp" android:gravity="center_vertical">
+     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="添加字幕，开始听读" android:textSize="22sp" android:textStyle="bold" android:textColor="?attr/paletteInk"/>
+     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginBottom="20dp" android:text="导入已有字幕，或从视频中识别" android:textSize="14sp" android:textColor="?attr/paletteMuted"/>
+     <com.google.android.material.button.MaterialButton android:id="@+id/video_prepare_subtitles" android:layout_width="match_parent" android:layout_height="56dp" android:text="导入字幕文件"/>
+     <com.google.android.material.button.MaterialButton android:id="@+id/video_prepare_asr" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="56dp" android:text="识别英文语音"/>
+     <com.google.android.material.button.MaterialButton android:id="@+id/video_prepare_ocr" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="识别画面中的英文"/>
+    </LinearLayout>
+   </ScrollView>
+  </FrameLayout>
  </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+ <View android:id="@+id/video_tools_scrim" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#66000000" android:visibility="gone" android:clickable="true" android:focusable="true" android:contentDescription="关闭字幕工具"/>
+ <ScrollView android:id="@+id/video_tools_panel" android:layout_width="match_parent" android:layout_height="400dp" android:layout_gravity="bottom" android:background="@drawable/video_tools_background" android:elevation="12dp" android:visibility="gone" android:fillViewport="true">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="字幕工具" android:textSize="20sp" android:textStyle="bold" android:textColor="?attr/paletteInk" android:accessibilityHeading="true"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/video_tools_close" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="完成"/>
+   </LinearLayout>
+   <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/video_panel_hide" android:layout_width="match_parent" android:layout_height="48dp" android:text="隐藏译文"/>
+   <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/video_panel_loop" android:layout_width="match_parent" android:layout_height="48dp" android:text="单句循环"/>
+   <TextView android:id="@+id/video_files" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingVertical="8dp" android:textColor="?attr/paletteMuted" android:textSize="12sp"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_pick" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="选择视频"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_subtitle_pick" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="导入 / 更换 SRT、VTT 字幕"/>
+   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+    <com.google.android.material.button.MaterialButton android:id="@+id/video_asr" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:text="识别英文语音"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/video_ocr" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:text="识别画面英文"/>
+   </LinearLayout>
+   <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="翻译与导出" android:textStyle="bold" android:textColor="?attr/paletteInk"/>
+   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+    <Spinner android:id="@+id/video_direction" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:contentDescription="字幕翻译方向" android:saveEnabled="false"/>
+    <com.google.android.material.button.MaterialButton android:id="@+id/video_service" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="翻译服务"/>
+   </LinearLayout>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_translate" android:layout_width="match_parent" android:layout_height="52dp" android:text="翻译字幕"/>
+   <com.google.android.material.button.MaterialButton android:id="@+id/video_export" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="导出字幕"/>
+  </LinearLayout>
+ </ScrollView>
+</FrameLayout>

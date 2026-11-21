@@ -20,5 +20,9 @@ public interface BookRepository {
 
   List<TocEntry> getTableOfContents(String bookId) throws AppException;
 
+  default void updateTxtChapterRule(String bookId, String regex) throws AppException {
+    throw new UnsupportedOperationException("TXT chapter rules unavailable");
+  }
+
   void deleteBook(String bookId) throws AppException;
 }

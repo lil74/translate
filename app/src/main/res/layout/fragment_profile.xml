@@ -1,0 +1,20 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:padding="24dp" android:orientation="vertical">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="我的" android:textSize="25sp" android:textStyle="bold"
+            android:layout_marginBottom="20dp"/>
+        <TextView android:id="@+id/profile_account" style="@style/HomeRow"
+            android:text="登录或注册账号　›"/>
+        <TextView android:id="@+id/profile_cloud_books" style="@style/HomeRow"
+            android:layout_marginTop="12dp" android:text="云端书库　›"/>
+        <TextView android:id="@+id/profile_favorites" style="@style/HomeRow"
+            android:text="单词与短语收藏　›"/>
+        <TextView android:id="@+id/profile_bookmarks" style="@style/HomeRow"
+            android:text="本机阅读书签　›"/>
+        <TextView android:id="@+id/profile_settings" style="@style/HomeRow"
+            android:layout_marginTop="12dp" android:text="应用设置　›"/>
+    </LinearLayout>
+</ScrollView>

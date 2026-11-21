@@ -15,22 +15,63 @@ public final class VideoProject {
     if (direction < 0 || direction > 3 || positionMs < 0 || cues == null || cues.size() > SubtitleCodec.MAX_CUES)
       throw new IllegalArgumentException("视频项目数据无效");
     Set<String> ids = new HashSet<>();
-    long previous=-1;
+    long previous = -1;
     for (SubtitleSegment cue : cues) {
       if (cue == null || !ids.add(cue.id) || cue.startMs < previous)
         throw new IllegalArgumentException("字幕顺序或标识无效");
-      previous=cue.startMs;
+      previous = cue.startMs;
     }
-    this.videoUri=videoUri; this.videoName=videoName; this.subtitleName=subtitleName;
-    this.direction=direction; this.translationKey=translationKey; this.demo=demo;
-    this.positionMs=positionMs; this.cues=Collections.unmodifiableList(new ArrayList<>(cues));
+    this.videoUri = videoUri;
+    this.videoName = videoName;
+    this.subtitleName = subtitleName;
+    this.direction = direction;
+    this.translationKey = translationKey;
+    this.demo = demo;
+    this.positionMs = positionMs;
+    this.cues = Collections.unmodifiableList(new ArrayList<>(cues));
   }
-  public static VideoProject empty() { return new VideoProject(null, null, null, 0, null, false, 0, Collections.emptyList()); }
+
+  public static VideoProject empty() {
+    return new VideoProject(null, null, null, 0, null, false, 0, Collections.emptyList());
+  }
+
+  public VideoProject named(String name) {
+    String value = name == null ? "" : name.trim();
+    if (value.isEmpty() || value.length() > 80)
+      throw new IllegalArgumentException("视频名称需为 1–80 个字符");
+    return new VideoProject(
+        videoUri, value, subtitleName, direction, translationKey, demo, positionMs, cues);
+  }
+
   public VideoProject withCues(List<SubtitleSegment> cues, String key, boolean demo) {
-    return new VideoProject(videoUri, videoName, subtitleName, direction, key, demo, positionMs, cues);
+    return new VideoProject(
+        videoUri, videoName, subtitleName, direction, key, demo, positionMs, cues);
   }
+
   public VideoProject position(long position) {
-    return new VideoProject(videoUri, videoName, subtitleName, direction, translationKey, demo, Math.max(0,position), cues);
+    return new VideoProject(
+        videoUri,
+        videoName,
+        subtitleName,
+        direction,
+        translationKey,
+        demo,
+        Math.max(0, position),
+        cues);
+  }
+
+  public int translatedCount() {
+    int count = 0;
+    for (SubtitleSegment cue : cues) if (cue.translatedText != null) count++;
+    return count;
+  }
+
+  public String sourceLanguage() {
+    return direction == 0 ? "en" : "zh-CN";
+  }
+
+  public String targetLanguage() {
+    return direction == 0 ? "zh-CN" : "en";
   }
   public int translatedCount() { int count=0; for (SubtitleSegment cue : cues) if (cue.translatedText!=null) count++; return count; }
   public String sourceLanguage() { return direction==0?"en":direction==1?"zh-CN":direction==2?"ko":"ja"; }

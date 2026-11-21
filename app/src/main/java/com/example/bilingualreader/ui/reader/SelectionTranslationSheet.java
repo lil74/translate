@@ -16,6 +16,8 @@ import com.example.bilingualreader.ReaderApplication;
 import com.example.bilingualreader.contract.model.Paragraph;
 import com.example.bilingualreader.contract.translation.TranslationInput;
 import com.example.bilingualreader.translation.SelectionContext;
+import com.example.bilingualreader.ui.profile.AccountClient;
+import com.example.bilingualreader.ui.profile.CloudExpressionClient;
 import com.example.bilingualreader.di.AppContainer;
 import com.example.bilingualreader.viewmodel.*;
 
@@ -117,6 +119,31 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
         ?new TranslationInput.Context(requireArguments().getString("contextText"),
             requireArguments().getInt("contextStart"),requireArguments().getInt("contextEnd")):null;
     ((TextView) view.findViewById(R.id.selection_source)).setText(selected);
+    View save=view.findViewById(R.id.selection_save);
+    save.setOnClickListener(v -> {
+      android.content.Context app=requireContext().getApplicationContext();
+      if(!new AccountClient(app).signedIn()) {
+        new ReaderLocalStore(app).saveExpression(selected);
+        Toast.makeText(requireContext(), "已收藏在本机；登录后可手动同步", Toast.LENGTH_SHORT).show();
+        return;
+      }
+      save.setEnabled(false);
+      new Thread(() -> {
+        try {
+          boolean exists=new CloudExpressionClient(app).save(selected);
+          if(isAdded()&&getView()==view)requireActivity().runOnUiThread(() -> {
+            save.setEnabled(true);
+            Toast.makeText(requireContext(),exists?"云端已收藏":"已收藏到当前账号",Toast.LENGTH_SHORT).show();
+          });
+        }catch(Exception error){
+          new ReaderLocalStore(app).saveExpression(selected);
+          if(isAdded()&&getView()==view)requireActivity().runOnUiThread(() -> {
+            save.setEnabled(true);
+            Toast.makeText(requireContext(),"云端保存失败，已暂存本机："+error.getMessage(),Toast.LENGTH_LONG).show();
+          });
+        }
+      },"save-cloud-expression").start();
+    });
     ImageButton speak=view.findViewById(R.id.selection_pronounce);
     TextView voiceStatus=view.findViewById(R.id.selection_voice_status);
     View voiceSettings=view.findViewById(R.id.selection_voice_settings);
@@ -166,14 +193,7 @@ public final class SelectionTranslationSheet extends AppCompatDialogFragment {
               vm.cancel();
               dismiss();
             });
-    if (vm.result.getValue() == null) {
-      if (vm.demo) vm.translate(selected,context);
-      else {
-        ((TextView) view.findViewById(R.id.selection_result))
-            .setText(context==null?R.string.selection_online_notice:R.string.selection_context_consent);
-        retry.setText(context==null?R.string.selection_confirm:R.string.selection_context_confirm);
-      }
-    }
+    if (vm.result.getValue() == null) vm.translate(selected,context);
   }
 
   @Override

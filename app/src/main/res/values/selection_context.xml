@@ -1,7 +1,7 @@
 <resources>
     <string name="selection_context_title">语境释义</string>
     <string name="selection_context_confirm">翻译</string>
-    <string name="selection_context_notice">结合当前段落理解所选文字</string>
+    <string name="selection_context_notice">自动结合段落释义；所选文字及附近段落发送到已配置服务</string>
     <string name="selection_context_consent">将发送所选词及附近段落。</string>
     <string name="selection_pronounce">朗读所选英文</string>
     <string name="selection_stop_pronounce">停止朗读</string>

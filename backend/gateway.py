@@ -108,7 +108,7 @@ class Gateway:
         if value.get("format", "text") != "text":
             raise ServiceError(400, "当前仅支持纯文本")
         profile = value.get("profile", "general")
-        if profile not in ("general", "subtitle"):
+        if profile not in ("general", "subtitle", "dictionary"):
             raise ServiceError(400, "不支持的翻译场景")
         context = value.get("context")
         if context is not None and (profile == "subtitle" or source != "en"):
@@ -220,6 +220,9 @@ _gateway = None
 
 
 def application(environ, start_response):
+    if (environ.get("PATH_INFO") or "").startswith(("/account/", "/books", "/expressions")):
+        from accounts import application as accounts_application
+        return accounts_application(environ, start_response)
     global _gateway
     if _gateway is None:
         try:

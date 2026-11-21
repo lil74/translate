@@ -74,7 +74,7 @@ public final class LibreTranslateService implements TranslationService {
       if (cancelled) throw new AppException(ErrorCode.TRANSLATION_FAILED, "翻译已停止", false);
       connection.setInstanceFollowRedirects(false);
       connection.setConnectTimeout(10000);
-      connection.setReadTimeout(30000);
+      connection.setReadTimeout(purpose == TranslationBatchRequest.Purpose.DICTIONARY ? 65000 : 30000);
       connection.setRequestMethod("POST");
       connection.setDoOutput(true);
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
@@ -85,6 +85,7 @@ public final class LibreTranslateService implements TranslationService {
       payload.addProperty("target", "zh-CN".equals(target) ? "zh" : target);
       payload.addProperty("format", "text");
       if (purpose == TranslationBatchRequest.Purpose.SUBTITLE) payload.addProperty("profile", "subtitle");
+      if (purpose == TranslationBatchRequest.Purpose.DICTIONARY) payload.addProperty("profile", "dictionary");
       if(item.getContext()!=null) {
         TranslationInput.Context context=item.getContext();
         JsonObject sourceContext=new JsonObject();sourceContext.addProperty("text",context.getText());
@@ -96,6 +97,19 @@ public final class LibreTranslateService implements TranslationService {
       try (OutputStream out = connection.getOutputStream()) { out.write(body); }
       int status = connection.getResponseCode();
       if (status != 200) {
+        if(purpose == TranslationBatchRequest.Purpose.DICTIONARY) {
+          String message="词典查询失败（HTTP "+status+"），请检查网络或服务配置";
+          try(InputStream error=connection.getErrorStream()) {
+            if(error!=null){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[1024];int count;
+              while((count=error.read(buffer))!=-1 && out.size()+count<=4096)out.write(buffer,0,count);
+              JsonObject value=JsonParser.parseString(out.toString("UTF-8")).getAsJsonObject();
+              JsonElement detail=value.get("error");
+              if(detail!=null && detail.isJsonPrimitive() && detail.getAsJsonPrimitive().isString() && detail.getAsString().length()<=300)message=detail.getAsString();
+            }
+          }catch(Exception ignored){}
+          throw new AppException(status==401||status==403?ErrorCode.AUTH_FAILED:ErrorCode.TRANSLATION_FAILED,message,status>=500||status==429);
+        }
+
         ErrorCode code = status == 401 || status == 403 ? ErrorCode.AUTH_FAILED
             : status == 429 ? ErrorCode.RATE_LIMITED
             : status >= 500 ? ErrorCode.NETWORK_ERROR : ErrorCode.TRANSLATION_FAILED;
@@ -117,6 +131,11 @@ public final class LibreTranslateService implements TranslationService {
         }
       }
       JsonObject response = JsonParser.parseString(bytes.toString("UTF-8")).getAsJsonObject();
+      if(purpose == TranslationBatchRequest.Purpose.DICTIONARY) {
+        JsonElement dictionary=response.get("dictionary");
+        if(dictionary==null || !dictionary.isJsonPrimitive() || !dictionary.getAsJsonPrimitive().isBoolean() || !dictionary.getAsBoolean())
+          throw new AppException(ErrorCode.UNSUPPORTED_CONTENT,"当前服务不支持词典查询，请使用更新后的团队云端服务",false);
+      }
       if(purpose == TranslationBatchRequest.Purpose.SUBTITLE) {
         JsonElement subtitle=response.get("subtitle");
         if(subtitle==null || !subtitle.isJsonPrimitive() || !subtitle.getAsJsonPrimitive().isBoolean()
