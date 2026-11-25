@@ -19,7 +19,8 @@ public final class SpeechClient {
     this(context,endpoint,token,"en");
   }
   public SpeechClient(Context context,String endpoint,String token,String language)throws Exception {
-    if(!"en".equals(language) && !"zh".equals(language))throw new IllegalArgumentException("不支持的语音识别语言");
+    if (!Arrays.asList("en", "zh", "ko", "ja").contains(language))
+      throw new IllegalArgumentException("不支持的语音识别语言");
     this.context=context.getApplicationContext();this.token=token;
     this.language=language;
     URL address=new URL(endpoint);
@@ -30,7 +31,7 @@ public final class SpeechClient {
     prefs=this.context.getSharedPreferences("video_asr_pending",Context.MODE_PRIVATE);
   }
   public List<SubtitleSegment> recognize(Uri video,Progress progress)throws Exception {
-    String key=base+"|"+language+"|"+video;
+    String key="seg-v2|"+base+"|"+language+"|"+video;
     String job=null;long offset=0;
     if(key.equals(prefs.getString("key",""))){job=prefs.getString("job",null);offset=prefs.getLong("offset",0);}
     if(job==null){

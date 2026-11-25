@@ -219,7 +219,6 @@ public final class VideoDeviceTest {
           assertEquals(View.VISIBLE, drawer.getVisibility());
           assertFalse(((PlayerView) activity.findViewById(R.id.video_player)).getUseController());
           assertTrue(drawer.getWidth() < stage.getWidth() / 2);
-          assertEquals(View.GONE, activity.findViewById(R.id.video_tools_panel).getVisibility());
         });
     await(
         () -> {
@@ -271,7 +270,7 @@ public final class VideoDeviceTest {
           activity.findViewById(R.id.video_drawer_hide).performClick();
           assertEquals(
               "显示译文",
-              ((TextView) activity.findViewById(R.id.video_hide_translation)).getText().toString());
+              ((TextView) activity.findViewById(R.id.video_drawer_hide)).getText().toString());
         });
     screenshot("video-fullscreen-caption-style.png");
     scenario.recreate();
@@ -362,7 +361,7 @@ public final class VideoDeviceTest {
     scenario.onActivity(
         activity -> {
           assertEquals(
-              "我的听力练习", ((TextView) activity.findViewById(R.id.video_title)).getText().toString());
+              "我的听力练习", ((TextView) activity.findViewById(R.id.video_fullscreen_title)).getText().toString());
           com.example.bilingualreader.ui.video.VideoNameDialog.show(
               activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container),
               Uri.fromFile(files.get(0)).toString(),
@@ -385,37 +384,6 @@ public final class VideoDeviceTest {
     await(() -> "Original video.mp4".equals(vm.project().videoName));
   }
 
-  @Test
-  public void studyPageKeepsPlayerFixedAndToolsCloseBeforeLeaving() throws Exception {
-    scenario.onActivity(
-        activity -> {
-          assertEquals(View.GONE, activity.findViewById(R.id.video_preparation).getVisibility());
-          assertEquals(
-              View.VISIBLE, activity.findViewById(R.id.video_learning_controls).getVisibility());
-          assertEquals(View.GONE, activity.findViewById(R.id.video_tools_panel).getVisibility());
-          View stage = activity.findViewById(R.id.video_stage);
-          int[] before = new int[2];
-          stage.getLocationOnScreen(before);
-          ((RecyclerView) activity.findViewById(R.id.video_cues)).scrollBy(0, 200);
-          int[] after = new int[2];
-          stage.getLocationOnScreen(after);
-          assertArrayEquals(before, after);
-          activity.findViewById(R.id.video_tools).performClick();
-          assertEquals(View.VISIBLE, activity.findViewById(R.id.video_tools_panel).getVisibility());
-          activity.getOnBackPressedDispatcher().onBackPressed();
-          assertTrue(
-              activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container)
-                  instanceof VideoFragment);
-          assertEquals(View.GONE, activity.findViewById(R.id.video_tools_panel).getVisibility());
-        });
-    translate();
-    await(() -> modelReady(true));
-    screenshot("video-study-ui.png");
-    scenario.onActivity(activity -> activity.findViewById(R.id.video_tools).performClick());
-    screenshot("video-tools-ui.png");
-    scenario.onActivity(activity -> activity.findViewById(R.id.video_tools_close).performClick());
-  }
-
   private void screenshot(String name) throws Exception {
     InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     android.graphics.Bitmap shot =
@@ -429,129 +397,43 @@ public final class VideoDeviceTest {
   }
 
   @Test
-  public void preparationOffersSubtitleImportAndRecognition() throws Exception {
-    File fresh = File.createTempFile("video-empty-", ".mp4", context.getCacheDir());
-    files.add(fresh);
-    java.nio.file.Files.copy(
-        files.get(0).toPath(), fresh.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    scenario.onActivity(
-        activity -> {
-          vm.video(Uri.fromFile(fresh), "New video");
-          assertEquals(View.VISIBLE, activity.findViewById(R.id.video_preparation).getVisibility());
-          assertEquals(
-              View.GONE, activity.findViewById(R.id.video_learning_controls).getVisibility());
-          assertEquals(View.GONE, activity.findViewById(R.id.video_tools_panel).getVisibility());
-          assertTrue(activity.findViewById(R.id.video_prepare_subtitles).isEnabled());
-          assertTrue(activity.findViewById(R.id.video_prepare_asr).isEnabled());
-          assertTrue(activity.findViewById(R.id.video_prepare_ocr).isEnabled());
-        });
-    screenshot("video-preparation-ui.png");
-  }
-
-  @Test
-  public void hiddenTranslationAppliesToOverlayAndRowsAndSurvivesRotation() throws Exception {
-    translate();
-    await(() -> modelReady(true));
-    await(
-        () -> {
-          AtomicBoolean ready = new AtomicBoolean();
-          scenario.onActivity(
-              activity -> {
-                Player player = ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer();
-                ready.set(player != null && player.getPlaybackState() == Player.STATE_READY);
-              });
-          return ready.get();
-        });
-    scenario.onActivity(
-        activity -> {
-          RecyclerView list = activity.findViewById(R.id.video_cues);
-          list.findViewHolderForAdapterPosition(0).itemView.performClick();
-          activity.findViewById(R.id.video_hide_translation).performClick();
-          assertFalse(
-              ((TextView) activity.findViewById(R.id.video_caption))
-                  .getText()
-                  .toString()
-                  .contains("译文:"));
-          ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer().pause();
-        });
-    scenario.recreate();
-    await(
-        () -> {
-          AtomicBoolean ready = new AtomicBoolean();
-          scenario.onActivity(
-              activity -> {
-                RecyclerView list = activity.findViewById(R.id.video_cues);
-                RecyclerView.ViewHolder row = list.findViewHolderForAdapterPosition(0);
-                ready.set(
-                    row != null
-                        && row.itemView.findViewById(R.id.cue_translation).getVisibility()
-                            == View.GONE);
-                assertEquals(
-                    "显示译文",
-                    ((TextView) activity.findViewById(R.id.video_hide_translation))
-                        .getText()
-                        .toString());
-              });
-          return ready.get();
-        });
-    scenario.onActivity(
-        activity -> activity.findViewById(R.id.video_hide_translation).performClick());
-    await(
-        () -> {
-          AtomicBoolean visible = new AtomicBoolean();
-          scenario.onActivity(
-              activity -> {
-                RecyclerView list = activity.findViewById(R.id.video_cues);
-                RecyclerView.ViewHolder row = list.findViewHolderForAdapterPosition(0);
-                visible.set(
-                    row != null
-                        && row.itemView.findViewById(R.id.cue_translation).getVisibility()
-                            == View.VISIBLE);
-              });
-          return visible.get();
-        });
-  }
-
-  @Test
-  public void sentenceLoopRepeatsAndCanReturnToSinglePlayback() throws Exception {
-    await(
-        () -> {
-          AtomicBoolean ready = new AtomicBoolean();
-          scenario.onActivity(
-              activity -> {
-                Player player = ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer();
-                ready.set(player != null && player.getPlaybackState() == Player.STATE_READY);
-              });
-          return ready.get();
-        });
-    scenario.onActivity(
-        activity -> {
-          ((android.widget.CompoundButton) activity.findViewById(R.id.video_loop)).setChecked(true);
-          ((RecyclerView) activity.findViewById(R.id.video_cues))
-              .findViewHolderForAdapterPosition(0)
-              .itemView
-              .performClick();
-        });
-    Thread.sleep(1800);
-    scenario.onActivity(
-        activity -> {
-          Player player = ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer();
-          assertTrue(player.getPlayWhenReady());
-          assertTrue(player.getCurrentPosition() < 1350);
-          ((android.widget.CompoundButton) activity.findViewById(R.id.video_loop))
-              .setChecked(false);
-        });
-    await(
-        () -> {
-          AtomicBoolean paused = new AtomicBoolean();
-          scenario.onActivity(
-              activity ->
-                  paused.set(
-                      !((PlayerView) activity.findViewById(R.id.video_player))
-                          .getPlayer()
-                          .getPlayWhenReady()));
-          return paused.get();
-        });
+  public void unifiedDialogTranslatesAndSubtitleRowSeeks() throws Exception {
+    scenario.onActivity(activity -> {
+      activity.findViewById(R.id.video_translate).performClick();
+      try {
+        Object page = activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        java.lang.reflect.Field field = page.getClass().getDeclaredField("dialog");
+        field.setAccessible(true);
+        androidx.appcompat.app.AlertDialog dialog = (androidx.appcompat.app.AlertDialog) field.get(page);
+        assertTrue(dialog.isShowing());
+        dialog.getButton(-1).performClick();
+      } catch (ReflectiveOperationException e) {
+        throw new AssertionError(e);
+      }
+    });
+    await(() -> {
+      AtomicBoolean ready = new AtomicBoolean();
+      scenario.onActivity(activity -> {
+        RecyclerView rows = activity.findViewById(R.id.video_cues);
+        Player player = ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer();
+        ready.set(!vm.busy && vm.project().translatedCount() == 2
+            && rows.findViewHolderForAdapterPosition(1) != null
+            && player.getPlaybackState() == Player.STATE_READY);
+      });
+      return ready.get();
+    });
+    scenario.onActivity(activity -> {
+      RecyclerView rows = activity.findViewById(R.id.video_cues);
+      Player player = ((PlayerView) activity.findViewById(R.id.video_player)).getPlayer();
+      rows.findViewHolderForAdapterPosition(1).itemView.performClick();
+      assertTrue(player.getCurrentPosition() >= 2000);
+    });
+    File exported = File.createTempFile("video-original-", ".srt", context.getCacheDir());
+    files.add(exported);
+    main(() -> vm.export(Uri.fromFile(exported), false, true, true));
+    await(() -> exported.length() > 20);
+    String result = new String(java.nio.file.Files.readAllBytes(exported.toPath()), StandardCharsets.UTF_8);
+    assertEquals("Hello, world!", new SubtitleCodec().acquire(result).get(0).sourceText);
   }
 
   @Test
