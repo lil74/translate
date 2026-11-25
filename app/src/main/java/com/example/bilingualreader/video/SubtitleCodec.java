@@ -64,15 +64,18 @@ public final class SubtitleCodec implements TimedTextSource<String> {
   }
 
   public static String export(List<SubtitleSegment> cues, boolean vtt, boolean bilingual) throws AppException {
+    return export(cues, vtt, bilingual, false);
+  }
+  public static String export(List<SubtitleSegment> cues, boolean vtt, boolean bilingual, boolean originalOnly) throws AppException {
     if (cues.isEmpty()) throw invalid("没有可导出的字幕");
     StringBuilder out = new StringBuilder(vtt ? "WEBVTT\n\n" : "");
     for (int i = 0; i < cues.size(); i++) {
       SubtitleSegment cue = cues.get(i);
-      if (cue.translatedText == null) throw invalid("还有未翻译的字幕，请继续翻译后再导出");
+      if (!originalOnly && cue.translatedText == null) throw invalid("还有未翻译的字幕，请继续翻译后再导出");
       out.append(i+1).append('\n').append(formatTime(cue.startMs, vtt)).append(" --> ")
           .append(formatTime(cue.endMs, vtt)).append('\n');
-      if (bilingual) out.append(escape(cue.sourceText)).append('\n');
-      out.append(escape(cue.translatedText)).append("\n\n");
+      if (bilingual && !originalOnly) out.append(escape(cue.sourceText)).append('\n');
+      out.append(escape(originalOnly ? cue.sourceText : cue.translatedText)).append("\n\n");
     }
     return out.toString();
   }

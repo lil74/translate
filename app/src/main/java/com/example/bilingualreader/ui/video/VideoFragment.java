@@ -32,14 +32,13 @@ public final class VideoFragment extends BaseFragment {
   private TextView caption;
   private CueAdapter adapter, drawerAdapter;
   private RecyclerView drawerList;
-  private boolean drawerVisible, drawerStyle, controllerVisible;
+  private boolean drawerVisible, drawerStyle;
   private int captionSize = 16, captionPosition = 2;
   private String loadedUri;
   private long replayEnd = -1;
   private SubtitleSegment replayCue;
   private RecyclerView cueList;
-  private boolean hideTranslation, loopSentence, followPlayback = true, toolsVisible;
-  private androidx.activity.OnBackPressedCallback toolsBack;
+  private boolean hideTranslation, loopSentence;
   private FrameLayout stage, fullscreenOverlay;
   private ViewGroup stageParent;
   private ViewGroup.LayoutParams stageParams;
@@ -48,7 +47,9 @@ public final class VideoFragment extends BaseFragment {
 
   private final Handler main = new Handler(Looper.getMainLooper());
   private androidx.appcompat.app.AlertDialog dialog;
-  private boolean exportVtt, exportBilingual = true;
+  private boolean exportOriginal;
+  private int importDirection;
+  private boolean exportImported;
   private final float[] speeds = {.75f, 1f, 1.25f, 1.5f, 2f};
   private final ActivityResultLauncher<String[]> videoPicker =
       registerForActivityResult(
@@ -69,23 +70,13 @@ public final class VideoFragment extends BaseFragment {
           new ActivityResultContracts.OpenDocument(),
           uri -> {
             if (uri == null || vm == null) return;
-            if (vm.project().cues.isEmpty()) vm.importSubtitles(uri, name(uri));
-            else {
-              closeDialog();
-              dialog =
-                  new MaterialAlertDialogBuilder(requireContext())
-                      .setTitle("替换当前字幕？")
-                      .setMessage("当前字幕和译文会被替换，视频保留。需要保留译文时请先导出字幕。")
-                      .setNegativeButton("取消", null)
-                      .setPositiveButton("替换", (d, w) -> vm.importSubtitles(uri, name(uri)))
-                      .show();
-            }
+            vm.importAndProcessSubtitles(uri, name(uri), importDirection, exportImported);
           });
   private final ActivityResultLauncher<String> exporter =
       registerForActivityResult(
           new ActivityResultContracts.CreateDocument("text/plain"),
           uri -> {
-            if (uri != null && vm != null) vm.export(uri, exportVtt, exportBilingual);
+            if (uri != null && vm != null) vm.export(uri, false, true, exportOriginal);
           });
 
   public VideoFragment() {
@@ -93,228 +84,263 @@ public final class VideoFragment extends BaseFragment {
   }
   @Override public void onViewCreated(@NonNull View view,@Nullable Bundle state) {
     super.onViewCreated(view,state);
-    vm=new ViewModelProvider(this,new ViewModelProvider.Factory(){
-      @NonNull @Override public <T extends ViewModel>T create(@NonNull Class<T> type){
-        return type.cast(new VideoViewModel(requireContext(),graph()));
+    String requested = getArguments() == null ? null : getArguments().getString("videoUri");
+    vm = new ViewModelProvider(this, new ViewModelProvider.Factory() {
+      @NonNull @Override public <T extends ViewModel> T create(@NonNull Class<T> type) {
+        return type.cast(new VideoViewModel(requireContext(), graph(), requested));
       }
     }).get(VideoViewModel.class);
-    if(state!=null){exportVtt=state.getBoolean("vtt");exportBilingual=state.getBoolean("bilingual",true);}
-    playerView=view.findViewById(R.id.video_player);caption=view.findViewById(R.id.video_caption);
-    RecyclerView list=view.findViewById(R.id.video_cues);
-    list.setLayoutManager(new LinearLayoutManager(requireContext()));adapter=new CueAdapter();list.setAdapter(adapter);
-    view.findViewById(R.id.video_pick).setOnClickListener(v -> videoPicker.launch(new String[]{"video/*"}));
-    view.findViewById(R.id.video_subtitle_pick).setOnClickListener(v -> subtitlePicker.launch(new String[]{"*/*"}));
-    view.findViewById(R.id.video_cancel).setOnClickListener(v -> {closeDialog();vm.cancel();});
-    view.findViewById(R.id.video_ocr).setOnClickListener(v -> chooseOcr());
-    view.findViewById(R.id.video_asr).setOnClickListener(v -> chooseSpeech());
-    view.findViewById(R.id.video_asr_chinese).setOnClickListener(v -> chooseChineseSpeech());
-    view.findViewById(R.id.video_soft_subtitle).setOnClickListener(v -> extractSoftSubtitles());
-    view.findViewById(R.id.video_translate).setOnClickListener(v -> confirmTranslation());
-    view.findViewById(R.id.video_export).setOnClickListener(v -> chooseExport());
-    view.findViewById(R.id.video_service).setVisibility(graph().translationConfig==null?View.GONE:View.VISIBLE);
-    view.findViewById(R.id.video_service).setOnClickListener(v -> TranslationSettingsDialog.show(requireContext(),graph().translationConfig));
-    Spinner direction=view.findViewById(R.id.video_direction);
-    direction.setAdapter(new ArrayAdapter<>(requireContext(),android.R.layout.simple_spinner_dropdown_item,new String[]{"英文 → 中文","中文 → 英文","韩语 → 中文","日语 → 中文"}));
-    direction.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
-      public void onNothingSelected(AdapterView<?> p){}
-      public void onItemSelected(AdapterView<?> p,View row,int position,long id){
-        if(!vm.busy && position!=vm.project().direction){closeDialog();vm.direction(position);}
-      }
+    exportOriginal = state != null && state.getBoolean("exportOriginal");
+    if (state != null) {
+      importDirection = state.getInt("importDirection");
+      exportImported = state.getBoolean("exportImported");
     }
-  }
-  private void render(){
-    if(getView()==null)return;
-    View view=requireView();VideoProject p=vm.project();
-    ((TextView)view.findViewById(R.id.video_files)).setText("视频："+(p.videoName==null?"未选择":p.videoName)+"\n字幕："+(p.subtitleName==null?"未导入":p.subtitleName));
-    ((TextView)view.findViewById(R.id.video_status)).setText(vm.message);
-    ((Spinner)view.findViewById(R.id.video_direction)).setSelection(p.direction);
-    view.findViewById(R.id.video_direction).setEnabled(!vm.busy);
-    view.findViewById(R.id.video_pick).setEnabled(!vm.busy);
-    view.findViewById(R.id.video_ocr).setEnabled(!vm.busy && p.videoUri!=null);
-    view.findViewById(R.id.video_asr).setEnabled(!vm.busy && p.videoUri!=null);
-    view.findViewById(R.id.video_asr_chinese).setEnabled(!vm.busy && p.videoUri!=null);
-    view.findViewById(R.id.video_soft_subtitle).setEnabled(!vm.busy && p.videoUri!=null);
-    view.findViewById(R.id.video_subtitle_pick).setEnabled(!vm.busy);
-    view.findViewById(R.id.video_translate).setEnabled(!vm.busy && !p.cues.isEmpty());
-    ((TextView)view.findViewById(R.id.video_translate)).setText(!p.cues.isEmpty() && p.translatedCount()==p.cues.size()?"重新翻译全部":"翻译 / 继续翻译");
-    view.findViewById(R.id.video_cancel).setVisibility(vm.busy?View.VISIBLE:View.GONE);
-    ((TextView)view.findViewById(R.id.video_cancel)).setText(vm.recognizingSpeech?"暂停等待":"取消处理");
-    view.findViewById(R.id.video_export).setEnabled(!vm.busy && !p.cues.isEmpty() && p.translatedCount()==p.cues.size());
-    view.findViewById(R.id.video_demo).setVisibility(p.demo && p.translatedCount()>0?View.VISIBLE:View.GONE);
-    ProgressBar progress=view.findViewById(R.id.video_progress);
-    progress.setVisibility(vm.busy?View.VISIBLE:View.GONE);progress.setIndeterminate(!vm.translating);
-    progress.setProgress(p.cues.isEmpty()?0:p.translatedCount()*1000/p.cues.size());
-    if(adapter.items!=p.cues){adapter.items=p.cues;adapter.notifyDataSetChanged();}
-    ensureMedia();tickCaptions();
+    hideTranslation = state != null && state.getBoolean("hideTranslation");
+    loopSentence = state != null && state.getBoolean("loopSentence");
+    drawerVisible = state != null && state.getBoolean("drawerVisible");
+    drawerStyle = state != null && state.getBoolean("drawerStyle");
+    getChildFragmentManager().setFragmentResultListener(VideoNameDialog.RESULT, getViewLifecycleOwner(),
+        (key, result) -> {
+          String custom = result.getString("customName", "");
+          vm.video(Uri.parse(result.getString("uri")),
+              custom.isEmpty() ? result.getString("filename") : custom);
+        });
+    playerView = view.findViewById(R.id.video_player);
+    stage = view.findViewById(R.id.video_stage);
+    stageParent = (ViewGroup) stage.getParent();
+    stageParams = stage.getLayoutParams();
+    stageIndex = stageParent.indexOfChild(stage);
+    caption = view.findViewById(R.id.video_caption);
+    cueList = view.findViewById(R.id.video_cues);
+    cueList.setLayoutManager(new LinearLayoutManager(requireContext()));
+    adapter = new CueAdapter();
+    cueList.setAdapter(adapter);
+    drawerList = stage.findViewById(R.id.video_drawer_cues);
+    drawerList.setLayoutManager(new LinearLayoutManager(requireContext()));
+    drawerAdapter = new CueAdapter(true);
+    drawerList.setAdapter(drawerAdapter);
+    fullscreenBack = new androidx.activity.OnBackPressedCallback(vm.fullScreen) {
+      @Override public void handleOnBackPressed() { setFullscreen(false, true); }
+    };
+    requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(), fullscreenBack);
+    stage.findViewById(R.id.video_fullscreen).setOnClickListener(v -> setFullscreen(!vm.fullScreen, true));
+    stage.findViewById(R.id.video_exit_fullscreen).setOnClickListener(v -> setFullscreen(false, true));
+    stage.findViewById(R.id.video_player_subtitles).setOnClickListener(v -> showSubtitleDrawer(!drawerVisible));
+    stage.findViewById(R.id.video_drawer_close).setOnClickListener(v -> showSubtitleDrawer(false));
+    stage.findViewById(R.id.video_subtitle_scrim).setOnClickListener(v -> showSubtitleDrawer(false));
+    stage.findViewById(R.id.video_drawer_list_tab).setOnClickListener(v -> setDrawerStyle(false));
+    stage.findViewById(R.id.video_drawer_style_tab).setOnClickListener(v -> setDrawerStyle(true));
+    stage.findViewById(R.id.video_caption_smaller).setOnClickListener(v -> {
+      captionSize = Math.max(12, captionSize - 2); applyCaptionStyle();
+    });
+    stage.findViewById(R.id.video_caption_larger).setOnClickListener(v -> {
+      captionSize = Math.min(32, captionSize + 2); applyCaptionStyle();
+    });
+    int[] positions = {R.id.video_caption_top, R.id.video_caption_middle, R.id.video_caption_bottom};
+    for (int i = 0; i < positions.length; i++) {
+      int position = i;
+      stage.findViewById(positions[i]).setOnClickListener(v -> {
+        captionPosition = position; applyCaptionStyle();
+      });
+    }
+    stage.findViewById(R.id.video_drawer_hide).setOnClickListener(v -> {
+      hideTranslation = !hideTranslation;
+      ((TextView) v).setText(hideTranslation ? "显示译文" : "隐藏译文");
+      adapter.notifyDataSetChanged();
+      drawerAdapter.notifyDataSetChanged();
+      tickCaptions();
+    });
+    stage.findViewById(R.id.video_drawer_loop).setOnClickListener(v -> {
+      loopSentence = !loopSentence;
+      ((TextView) v).setText(loopSentence ? "单句循环：开" : "单句循环：关");
+    });
+    TextView speed = stage.findViewById(R.id.video_speed);
+    speed.setText(vm.playbackSpeed + "×");
+    speed.setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+        .setTitle("播放速度").setItems(new String[]{"0.75×", "1.0×", "1.25×", "1.5×", "2.0×"},
+            (d, index) -> {
+              vm.playbackSpeed = speeds[index];
+              speed.setText(vm.playbackSpeed + "×");
+              if (player != null) player.setPlaybackSpeed(vm.playbackSpeed);
+            }).show());
+    view.findViewById(R.id.video_translate).setOnClickListener(v -> {
+      if (vm.project().videoUri == null) videoPicker.launch(new String[]{"video/*"});
+      else showTranslationDialog();
+    });
+    view.findViewById(R.id.video_cancel).setOnClickListener(v -> vm.cancel());
+    vm.changes.observe(getViewLifecycleOwner(), ignored -> render());
   }
 
   private void render() {
-    if (getView() == null) return;
-    View view = requireView();
-    VideoProject p = vm.project();
-    boolean hasCues = !p.cues.isEmpty();
-    ((TextView) findVideoView(R.id.video_title))
-        .setText(p.videoName == null ? "视频学习" : p.videoName);
-    ((TextView) findVideoView(R.id.video_fullscreen_title))
-        .setText(p.videoName == null ? "视频学习" : p.videoName);
-    ((TextView) findVideoView(R.id.video_summary))
-        .setText(hasCues ? p.cues.size() + " 句字幕 · 已翻译 " + p.translatedCount() + " 句" : "准备字幕");
-    findVideoView(R.id.video_learning_controls).setVisibility(hasCues ? View.VISIBLE : View.GONE);
-    findVideoView(R.id.video_preparation).setVisibility(hasCues ? View.GONE : View.VISIBLE);
-    findVideoView(R.id.video_cues).setVisibility(hasCues ? View.VISIBLE : View.GONE);
-    ((TextView) findVideoView(R.id.video_files))
-        .setText(
-            "视频："
-                + (p.videoName == null ? "未选择" : p.videoName)
-                + "\n字幕："
-                + (p.subtitleName == null ? "未导入" : p.subtitleName));
+    VideoProject project = vm.project();
+    TextView action = findVideoView(R.id.video_translate);
+    action.setEnabled(!vm.busy);
+    action.setText(project.videoUri == null ? "选择视频"
+        : project.cues.isEmpty() ? "翻译视频" : "重新翻译");
+    ((TextView) findVideoView(R.id.video_fullscreen_title)).setText(project.videoName);
     ((TextView) findVideoView(R.id.video_status)).setText(vm.message);
-    ((Spinner) findVideoView(R.id.video_direction)).setSelection(p.direction);
-    findVideoView(R.id.video_direction).setEnabled(!vm.busy);
-    findVideoView(R.id.video_pick).setEnabled(!vm.busy);
-    findVideoView(R.id.video_ocr).setEnabled(!vm.busy && p.videoUri != null);
-    findVideoView(R.id.video_asr).setEnabled(!vm.busy && p.videoUri != null);
-    findVideoView(R.id.video_subtitle_pick).setEnabled(!vm.busy);
-    findVideoView(R.id.video_prepare_subtitles).setEnabled(!vm.busy);
-    findVideoView(R.id.video_prepare_asr).setEnabled(!vm.busy && p.videoUri != null);
-    findVideoView(R.id.video_prepare_ocr).setEnabled(!vm.busy && p.videoUri != null);
-    findVideoView(R.id.video_translate).setEnabled(!vm.busy && !p.cues.isEmpty());
-    ((TextView) findVideoView(R.id.video_translate))
-        .setText(
-            !p.cues.isEmpty() && p.translatedCount() == p.cues.size() ? "重新翻译全部" : "翻译 / 继续翻译");
     findVideoView(R.id.video_cancel).setVisibility(vm.busy ? View.VISIBLE : View.GONE);
-    ((TextView) findVideoView(R.id.video_cancel)).setText(vm.recognizingSpeech ? "暂停等待" : "取消处理");
-    findVideoView(R.id.video_export)
-        .setEnabled(!vm.busy && !p.cues.isEmpty() && p.translatedCount() == p.cues.size());
-    findVideoView(R.id.video_demo)
-        .setVisibility(p.demo && p.translatedCount() > 0 ? View.VISIBLE : View.GONE);
+    ((TextView) findVideoView(R.id.video_cancel))
+        .setText(vm.recognizingSpeech ? "暂停等待" : "取消处理");
+    findVideoView(R.id.video_demo).setVisibility(project.demo ? View.VISIBLE : View.GONE);
     ProgressBar progress = findVideoView(R.id.video_progress);
     progress.setVisibility(vm.busy ? View.VISIBLE : View.GONE);
     progress.setIndeterminate(!vm.translating);
-    progress.setProgress(p.cues.isEmpty() ? 0 : p.translatedCount() * 1000 / p.cues.size());
-    if (adapter.items != p.cues) {
-      adapter.items = p.cues;
-      adapter.active = -1;
+    if (!project.cues.isEmpty()) progress.setProgress(project.translatedCount() * 1000 / project.cues.size());
+    if (adapter.items != project.cues) {
+      adapter.items = project.cues;
+      drawerAdapter.items = project.cues;
+      adapter.active = drawerAdapter.active = -1;
       adapter.notifyDataSetChanged();
-      if (replayCue != null) {
-        SubtitleSegment found = null;
-        for (SubtitleSegment cue : p.cues) if (cue.id.equals(replayCue.id)) found = cue;
-        replayCue = found;
-        replayEnd = found == null ? -1 : found.endMs;
-      }
-    }
-    if (drawerAdapter.items != p.cues) {
-      drawerAdapter.items = p.cues;
-      drawerAdapter.active = -1;
       drawerAdapter.notifyDataSetChanged();
     }
-    updateDrawer();
+    ((TextView) stage.findViewById(R.id.video_drawer_count)).setText("字幕 · " + project.cues.size());
+    setDrawerStyle(drawerStyle);
     ensureMedia();
     tickCaptions();
-  }
-  private void extractSoftSubtitles(){
-    if(player!=null)player.pause();closeDialog();
-    boolean replacing=!vm.project().cues.isEmpty();
-    dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle(replacing?"替换当前字幕？":"提取视频内嵌软字幕？")
-        .setMessage((replacing?"提取后会替换当前字幕和译文。需要保留时请先导出。":"")
-            +"在本机读取视频内嵌的字幕轨道和时间戳，视频不会上传。")
-        .setNegativeButton("取消",null).setPositiveButton("提取",(d,w)->vm.extractSoftSubtitles()).show();
-  }
-  private void chooseSpeech(){
-    if(player!=null)player.pause();closeDialog();
-    try{
-      VideoViewModel.SpeechPrepared prepared=vm.prepareSpeech();
-      dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("上传音频并识别英文语音？")
-          .setMessage("会从视频提取 AAC 音频，发送到 "+prepared.translation.endpoint
-              +" 对应的团队服务器，并交给阿里云百炼识别，再自动翻译成中文。视频画面不上传。"
-              +"语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。成功后会替换当前字幕和译文。"
-              +"暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
-          .setNegativeButton("取消",null).setPositiveButton("同意并开始",(d,w)->vm.recognizeSpeech(prepared)).show();
-    }catch(Exception error){notice(error instanceof com.example.bilingualreader.contract.model.AppException
-        ?((com.example.bilingualreader.contract.model.AppException)error).getUserMessage():error.getMessage());}
-  }
-  private void chooseChineseSpeech(){
-    if(player!=null)player.pause();closeDialog();
-    try{
-      VideoViewModel.SpeechPrepared prepared=vm.prepareSpeech("zh");
-      dialog=new MaterialAlertDialogBuilder(requireContext()).setTitle("上传音频并识别中文语音？")
-          .setMessage("会从视频提取 AAC 音频，发送到 "+prepared.translation.endpoint
-              +" 对应的团队服务器，由阿里云百炼识别为中文字幕。视频画面不上传。"
-              +"语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。识别结果将替换当前字幕。"
-              +"暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
-          .setNegativeButton("取消",null).setPositiveButton("同意并开始",(d,w)->vm.recognizeChineseSpeech(prepared)).show();
-    }catch(Exception error){notice(error instanceof com.example.bilingualreader.contract.model.AppException
-        ?((com.example.bilingualreader.contract.model.AppException)error).getUserMessage():error.getMessage());}
-  }
-  private void confirmTranslation(){
-    try {
-      VideoViewModel.SpeechPrepared prepared = vm.prepareSpeech();
-      dialog =
-          new MaterialAlertDialogBuilder(requireContext())
-              .setTitle("上传音频并识别英文语音？")
-              .setMessage(
-                  "会从视频提取 AAC 音频，发送到 "
-                      + prepared.translation.endpoint
-                      + " 对应的团队服务器，并交给阿里云百炼识别，再自动翻译成中文。视频画面不上传。"
-                      + "语音识别可能按量收费，支持 10 分钟内、20 MB 内音频。成功后会替换当前字幕和译文。"
-                      + "暂停等待不保证停止已提交的云端计费任务；同一任务可继续获取结果。")
-              .setNegativeButton("取消", null)
-              .setPositiveButton("同意并开始", (d, w) -> vm.recognizeSpeech(prepared))
-              .show();
-    } catch (Exception error) {
-      notice(
-          error instanceof com.example.bilingualreader.contract.model.AppException
-              ? ((com.example.bilingualreader.contract.model.AppException) error).getUserMessage()
-              : error.getMessage());
-    }
+    if (isResumed()) openPendingExport();
   }
 
-  private void confirmTranslation() {
-    try {
-      VideoViewModel.Prepared prepared =
-          vm.prepare(vm.project().translatedCount() == vm.project().cues.size());
-      if (prepared.binding.demo) {
-        vm.translate(prepared);
+  private <T extends View> T findVideoView(int id) {
+    T view = requireView().findViewById(id);
+    return view != null ? view : stage.findViewById(id);
+  }
+
+  private void showTranslationDialog() {
+    closeDialog();
+    LinearLayout fields = new LinearLayout(requireContext());
+    fields.setOrientation(LinearLayout.VERTICAL);
+    int padding = Math.round(24 * getResources().getDisplayMetrics().density);
+    fields.setPadding(padding, 0, padding, 0);
+    addChoiceLabel(fields, "翻译语言");
+    LinearLayout languages = new LinearLayout(requireContext());
+    languages.setGravity(Gravity.CENTER_VERTICAL);
+    fields.addView(languages);
+    int[] directions = {1, 0, 2, 3};
+    Spinner direction = createChoice("原文语言", new String[]{"中文", "英文", "韩文", "日文"});
+    languages.addView(direction, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView target = new TextView(requireContext());
+    target.setText(" → 简体中文");
+    target.setTextSize(16);
+    languages.addView(target);
+    for (int i = 0; i < directions.length; i++)
+      if (directions[i] == vm.project().direction) direction.setSelection(i);
+
+    boolean hasCues = !vm.project().cues.isEmpty();
+    String[] sources = hasCues
+        ? new String[]{"使用当前字幕", "提取内嵌软字幕", "识别画面硬字幕", "识别视频语音", "导入 SRT / VTT"}
+        : new String[]{"提取内嵌软字幕", "识别画面硬字幕", "识别视频语音", "导入 SRT / VTT"};
+    addChoiceLabel(fields, "字幕来源");
+    Spinner source = createChoice("字幕来源", sources);
+    fields.addView(source);
+    TextView note = new TextView(requireContext());
+    fields.addView(note);
+    Switch export = new Switch(requireContext());
+    export.setText("导出字幕（SRT）");
+    export.setMinHeight(Math.round(48 * getResources().getDisplayMetrics().density));
+    fields.addView(export);
+    Runnable updateNote = () -> {
+      boolean chinese = directions[direction.getSelectedItemPosition()] == 1;
+      int mode = source.getSelectedItemPosition() + (hasCues ? 0 : 1);
+      String message = chinese ? "生成中文字幕。" : "在线翻译会发送字幕文本。";
+      if (mode == 3) message += "语音识别会上传音频，可能产生费用。";
+      if (mode == 4 && hasCues) message += "成功导入后会替换当前字幕和译文。";
+      note.setText(message);
+    };
+    AdapterView.OnItemSelectedListener update = new AdapterView.OnItemSelectedListener() {
+      @Override public void onItemSelected(AdapterView<?> parent, View row, int position, long id) {
+        updateNote.run();
+      }
+      @Override public void onNothingSelected(AdapterView<?> parent) {}
+    };
+    direction.setOnItemSelectedListener(update);
+    source.setOnItemSelectedListener(update);
+    updateNote.run();
+    ScrollView scroll = new ScrollView(requireContext());
+    scroll.addView(fields);
+    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext())
+        .setTitle(hasCues ? "重新翻译" : "翻译视频")
+        .setView(scroll)
+        .setNegativeButton("取消", null)
+        .setPositiveButton("确认", null);
+    if (graph().translationConfig != null) builder.setNeutralButton("翻译服务",
+        (d, w) -> TranslationSettingsDialog.show(requireContext(), graph().translationConfig));
+    dialog = builder.create();
+    dialog.setOnShowListener(ignored -> dialog.getButton(-1).setOnClickListener(v -> {
+      int mode = source.getSelectedItemPosition() + (hasCues ? 0 : 1);
+      int selectedDirection = directions[direction.getSelectedItemPosition()];
+      if (mode == 4) {
+        importDirection = selectedDirection;
+        exportImported = export.isChecked();
+        if (player != null) player.pause();
+        closeDialog();
+        subtitlePicker.launch(new String[]{"*/*"});
         return;
       }
-      closeDialog();
-      dialog =
-          new MaterialAlertDialogBuilder(requireContext())
-              .setTitle("发送字幕文本用于翻译？")
-              .setMessage(
-                  "将向 "
-                      + prepared.endpoint
-                      + " 发送字幕原文。\n方向："
-                      + ("en".equals(prepared.source) ? "英文 → 中文" : "中文 → 英文")
-                      + "\n共 "
-                      + vm.project().cues.size()
-                      + " 条字幕。视频文件不会上传；译文会保存在本机。"
-                      + (prepared.restart ? "本次会清除旧译文并重新翻译全部字幕。" : "同一服务已完成的片段会跳过；切换服务会重新生成译文。"))
-              .setNegativeButton("取消", null)
-              .setPositiveButton("同意并翻译", (d, w) -> vm.translate(prepared))
-              .show();
-    } catch (com.example.bilingualreader.contract.model.AppException error) {
-      notice(error.getUserMessage());
-    }
+      try {
+        vm.processVideo(selectedDirection, mode, export.isChecked());
+        if (player != null) player.pause();
+        closeDialog();
+      } catch (Exception error) {
+        notice(error instanceof com.example.bilingualreader.contract.model.AppException
+            ? ((com.example.bilingualreader.contract.model.AppException) error).getUserMessage()
+            : error.getMessage());
+      }
+    }));
+    dialog.show();
   }
 
-  private void chooseExport() {
-    closeDialog();
-    String[] options = {"双语 SRT", "仅译文 SRT", "双语 VTT", "仅译文 VTT"};
-    dialog =
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("导出字幕")
-            .setItems(
-                options,
-                (d, which) -> {
-                  exportVtt = which >= 2;
-                  exportBilingual = which % 2 == 0;
-                  exporter.launch(
-                      "video-subtitles"
-                          + (vm.project().demo ? "-demo" : "")
-                          + (exportVtt ? ".vtt" : ".srt"));
-                })
-            .show();
+  private void addChoiceLabel(LinearLayout fields, String label) {
+    TextView title = new TextView(requireContext());
+    title.setText(label);
+    fields.addView(title);
+  }
+
+  private Spinner createChoice(String label, String[] choices) {
+    Spinner spinner = new Spinner(requireContext());
+    spinner.setContentDescription(label);
+    spinner.setMinimumHeight(Math.round(48 * getResources().getDisplayMetrics().density));
+    spinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, choices));
+    return spinner;
+  }
+
+  private void openPendingExport() {
+    Boolean original = vm.consumeExport();
+    if (original == null) return;
+    exportOriginal = original;
+    exporter.launch(original ? "中文字幕.srt" : "双语字幕.srt");
+  }
+
+  private void showSubtitleDrawer(boolean visible) {
+    drawerVisible = visible;
+    stage.findViewById(R.id.video_subtitle_drawer).setVisibility(visible ? View.VISIBLE : View.GONE);
+    stage.findViewById(R.id.video_subtitle_scrim).setVisibility(visible ? View.VISIBLE : View.GONE);
+  }
+
+  private void setDrawerStyle(boolean style) {
+    drawerStyle = style;
+    boolean empty = vm.project().cues.isEmpty();
+    drawerList.setVisibility(!style && !empty ? View.VISIBLE : View.GONE);
+    stage.findViewById(R.id.video_drawer_empty).setVisibility(!style && empty ? View.VISIBLE : View.GONE);
+    stage.findViewById(R.id.video_drawer_style).setVisibility(style ? View.VISIBLE : View.GONE);
+  }
+
+  private void applyCaptionStyle() {
+    caption.setTextSize(captionSize);
+    ((TextView) stage.findViewById(R.id.video_caption_size)).setText(String.valueOf(captionSize));
+    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) caption.getLayoutParams();
+    params.gravity = new int[]{Gravity.TOP, Gravity.CENTER_VERTICAL, Gravity.BOTTOM}[captionPosition];
+    caption.setLayoutParams(params);
+  }
+
+  private void followActiveCue() {
+    if (adapter.active >= 0) cueList.scrollToPosition(adapter.active);
+    if (drawerVisible && drawerAdapter.active >= 0) drawerList.scrollToPosition(drawerAdapter.active);
+  }
+
+  @Override public void onResume() {
+    super.onResume();
+    openPendingExport();
   }
 
   private void edit(SubtitleSegment cue) {
@@ -403,14 +429,14 @@ public final class VideoFragment extends BaseFragment {
       adapter.active = active;
       if (old >= 0 && old < adapter.getItemCount()) adapter.notifyItemChanged(old);
       if (active >= 0) adapter.notifyItemChanged(active);
-      if (followPlayback && player.isPlaying()) followActiveCue();
+      if (player.isPlaying()) followActiveCue();
     }
     if (drawerAdapter != null && drawerAdapter.active != active) {
       int old = drawerAdapter.active;
       drawerAdapter.active = active;
       if (old >= 0 && old < drawerAdapter.getItemCount()) drawerAdapter.notifyItemChanged(old);
       if (active >= 0) drawerAdapter.notifyItemChanged(active);
-      if (drawerVisible && followPlayback && player.isPlaying()) followActiveCue();
+      if (drawerVisible && player.isPlaying()) followActiveCue();
     }
     if (loopSentence && replayCue == null && active >= 0 && player.isPlaying()) {
       replayCue = vm.project().cues.get(active);
@@ -495,12 +521,11 @@ public final class VideoFragment extends BaseFragment {
   @Override
   public void onSaveInstanceState(@NonNull Bundle state) {
     super.onSaveInstanceState(state);
-    state.putBoolean("vtt", exportVtt);
-    state.putBoolean("bilingual", exportBilingual);
+    state.putBoolean("exportOriginal", exportOriginal);
+    state.putInt("importDirection", importDirection);
+    state.putBoolean("exportImported", exportImported);
     state.putBoolean("hideTranslation", hideTranslation);
     state.putBoolean("loopSentence", loopSentence);
-    state.putBoolean("followPlayback", followPlayback);
-    state.putBoolean("toolsVisible", toolsVisible);
     state.putBoolean("drawerVisible", drawerVisible);
     state.putBoolean("drawerStyle", drawerStyle);
   }
@@ -514,7 +539,6 @@ public final class VideoFragment extends BaseFragment {
 
   private void setFullscreen(boolean enabled, boolean rotate) {
     boolean reopen = drawerVisible;
-    showTools(false);
     showSubtitleDrawer(false);
     if (enabled && fullscreenOverlay == null) {
       stageParent.removeView(stage);
@@ -531,7 +555,6 @@ public final class VideoFragment extends BaseFragment {
     }
     vm.fullScreen = enabled;
     stage.findViewById(R.id.video_fullscreen_top).setVisibility(enabled ? View.VISIBLE : View.GONE);
-    resizeVideoLayout();
     applyCaptionStyle();
     if (reopen && enabled) showSubtitleDrawer(true);
     fullscreenBack.setEnabled(enabled);
@@ -549,7 +572,6 @@ public final class VideoFragment extends BaseFragment {
               enabled
                   ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                   : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-    if (!enabled && getView() != null) getView().post(this::resizeVideoLayout);
   }
 
   @Override
@@ -575,7 +597,6 @@ public final class VideoFragment extends BaseFragment {
     drawerAdapter = null;
     adapter = null;
     cueList = null;
-    toolsBack = null;
     super.onDestroyView();
   }
 
@@ -635,8 +656,8 @@ public final class VideoFragment extends BaseFragment {
               notice("请先选择视频");
               return;
             }
-            replayCue = cue;
-            replayEnd = cue.endMs;
+            replayCue = loopSentence ? cue : null;
+            replayEnd = loopSentence ? cue.endMs : -1;
             player.seekTo(cue.startMs);
             player.play();
             playerView.hideController();

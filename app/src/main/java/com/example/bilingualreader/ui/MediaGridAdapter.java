@@ -68,11 +68,13 @@ public final class MediaGridAdapter<T> extends RecyclerView.Adapter<MediaGridAda
     if (holder.job != null) holder.job.cancel(true);
     String source = presenter.image(value), key = presenter.key(value) + ":" + source;
     holder.key = key;
-    ((CoverFrame) holder.itemView.findViewById(R.id.media_cover_frame))
-        .ratio(video ? 16f / 9f : 2f / 3f);
+    CoverFrame coverFrame = holder.itemView.findViewById(R.id.media_cover_frame);
+    coverFrame.ratio(video ? 16f / 9f : 2f / 3f);
+    int inset = video ? 0 : Math.round(12 * coverFrame.getResources().getDisplayMetrics().density);
+    coverFrame.setPadding(inset, inset, inset, inset);
+    holder.placeholder.setBackgroundResource(video ? 0 : R.drawable.soft_panel);
     holder.image.setImageDrawable(null);
-    holder.image.setScaleType(
-        video ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
+    holder.image.setScaleType(ImageView.ScaleType.CENTER_CROP);
     holder.placeholder.setText(presenter.title(value));
     holder.placeholder.setVisibility(View.VISIBLE);
     ((TextView) holder.itemView.findViewById(R.id.media_title)).setText(presenter.title(value));

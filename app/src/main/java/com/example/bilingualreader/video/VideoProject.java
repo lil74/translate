@@ -67,13 +67,10 @@ public final class VideoProject {
   }
 
   public String sourceLanguage() {
-    return direction == 0 ? "en" : "zh-CN";
+    return new String[]{"en", "zh-CN", "ko", "ja"}[direction];
   }
 
   public String targetLanguage() {
-    return direction == 0 ? "zh-CN" : "en";
+    return direction == 1 ? "en" : "zh-CN";
   }
-  public int translatedCount() { int count=0; for (SubtitleSegment cue : cues) if (cue.translatedText!=null) count++; return count; }
-  public String sourceLanguage() { return direction==0?"en":direction==1?"zh-CN":direction==2?"ko":"ja"; }
-  public String targetLanguage() { return direction==1 ? "en" : "zh-CN"; }
 }

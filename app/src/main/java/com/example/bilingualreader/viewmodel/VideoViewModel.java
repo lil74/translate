@@ -76,6 +76,25 @@ public final class VideoViewModel extends ViewModel {
     message=replacing?"已切换视频，可点击识别画面英文":"视频已选择，可点击识别画面英文"; changed();
   }
   public void importSubtitles(Uri uri, String name) {
+    importSubtitles(uri, name, null);
+  }
+
+  public void importAndProcessSubtitles(Uri uri, String name, int direction, boolean export) {
+    importSubtitles(uri, name, () -> {
+      try {
+        processVideo(direction, 0, export);
+      } catch (AppException error) {
+        message = error.getUserMessage();
+        publish();
+      } catch (Exception error) {
+        message = "字幕已导入，无法开始翻译，请检查服务设置";
+        publish();
+      }
+    });
+  }
+
+  private void importSubtitles(Uri uri, String name, Runnable onImported) {
+    if (busy) return;
     cancel(); busy=true; final long token=generation; message="正在解析字幕…"; publish();
     io.execute(() -> {
       try {
@@ -97,6 +116,7 @@ public final class VideoViewModel extends ViewModel {
         main.post(() -> { if(cleared || token!=generation)return;
           project=new VideoProject(project.videoUri,project.videoName,name,project.direction,null,false,project.positionMs,parsed);
           busy=false; message="已导入 "+parsed.size()+" 条字幕，点击字幕可定位，长按可修正原文"; changed();
+          if (onImported != null) onImported.run();
         });
       } catch (Exception error) { main.post(() -> { if(cleared || token!=generation)return;
         busy=false; message=error instanceof AppException ? ((AppException)error).getUserMessage()
@@ -224,7 +244,92 @@ public final class VideoViewModel extends ViewModel {
     return new Prepared(graph.selectionBinding(),graph.translationConfig==null?"当前在线服务":graph.translationConfig.endpoint(),
         project.sourceLanguage(),project.targetLanguage(),generation,restart);
   }
+  private Boolean pendingExport;
+  private boolean exportAfterTranslation;
+
+  public Boolean consumeExport() {
+    Boolean result = pendingExport;
+    pendingExport = null;
+    return result;
+  }
+
+  public void processVideo(int direction, int mode, boolean export) throws Exception {
+    if (busy || project.videoUri == null) return;
+    String source = new String[]{"en", "zh-CN", "ko", "ja"}[direction];
+    String target = "zh-CN";
+    boolean originalOnly = direction == 1;
+    if (mode == 2 && direction == 1)
+      throw new IllegalArgumentException("硬字幕识别支持英语、日语和韩语。中文可选择语音识别或导入字幕");
+    Prepared binding = originalOnly ? null : prepare();
+    SpeechClient speech = mode == 3 ? prepareSpeech("zh-CN".equals(source) ? "zh" : source).client : null;
+    if (mode == 0 && project.cues.isEmpty()) return;
+    if (mode == 0) {
+      if (originalOnly) {
+        direction(direction);
+        List<SubtitleSegment> originals = new ArrayList<>();
+        for (SubtitleSegment cue : project.cues) originals.add(cue.clearTranslation());
+        project = project.withCues(originals, null, false);
+        message = "中文字幕已就绪，共 " + originals.size() + " 条";
+        if (export) pendingExport = true;
+        changed();
+      } else {
+        direction(direction);
+        translate(new Prepared(binding.binding, binding.endpoint, source, target, generation,
+            project.translatedCount() == project.cues.size()), export);
+      }
+      return;
+    }
+    cancel();
+    long token = generation;
+    Uri video = Uri.parse(project.videoUri);
+    busy = true;
+    recognizingSpeech = speech != null;
+    message = "正在生成字幕…";
+    publish();
+    pending = network.submit(() -> {
+      try {
+        List<SubtitleSegment> cues;
+        if (mode == 1) cues = SoftSubtitleExtractor.extract(context, video);
+        else if (mode == 2) cues = new VideoOcr().scan(context, video, .65f, 1f, source, percent -> main.post(() -> {
+          if (!cleared && token == generation) {
+            message = "正在识别画面字幕：" + percent + "%";
+            publish();
+          }
+        }));
+        else cues = speech.recognize(video, status -> main.post(() -> {
+          if (!cleared && token == generation) { message = status; publish(); }
+        }));
+        main.post(() -> {
+          if (cleared || token != generation) return;
+          String name = mode == 1 ? "视频软字幕" : mode == 2 ? "画面硬字幕" : "视频语音";
+          project = new VideoProject(project.videoUri, project.videoName, name, direction, null,
+              false, project.positionMs, cues);
+          busy = false;
+          recognizingSpeech = false;
+          message = "字幕已生成，共 " + cues.size() + " 条";
+          if (originalOnly) {
+            if (export) pendingExport = true;
+            changed();
+          } else {
+            translate(new Prepared(binding.binding, binding.endpoint, source, target, generation, false), export);
+          }
+        });
+      } catch (Exception error) {
+        main.post(() -> {
+          if (cleared || token != generation) return;
+          busy = false;
+          recognizingSpeech = false;
+          message = error.getMessage() == null ? "字幕生成失败，请检查视频或更换字幕来源" : error.getMessage();
+          publish();
+        });
+      }
+    });
+  }
+
   public void translate(Prepared prepared) {
+    translate(prepared, false);
+  }
+  private void translate(Prepared prepared, boolean export) {
     if(cleared || busy || prepared.generation!=generation || project.cues.isEmpty())return;
     cancel(); final long token=generation;
     if(prepared.restart || !prepared.key.equals(project.translationKey)) {
@@ -244,7 +349,9 @@ public final class VideoViewModel extends ViewModel {
           });
         });
         main.post(() -> { if(cleared || token!=generation)return;
-          busy=false; translating=false; message="字幕翻译完成，可播放双语字幕或导出"; changed();
+          busy=false; translating=false; message="字幕翻译完成，可播放双语字幕或导出";
+          if (export) pendingExport = false;
+          changed();
         });
       } catch(Exception error) { main.post(() -> { if(cleared || token!=generation)return;
         busy=false; translating=false;
@@ -259,10 +366,13 @@ public final class VideoViewModel extends ViewModel {
         ?"已暂停等待，云端语音任务可能仍在运行；点击语音识别可继续获取结果":"处理已取消，已完成字幕保留";recognizingSpeech=false;publish();}
   }
   public void export(Uri destination, boolean vtt, boolean bilingual) {
+    export(destination, vtt, bilingual, false);
+  }
+  public void export(Uri destination, boolean vtt, boolean bilingual, boolean originalOnly) {
     final String text;
-    try { text=SubtitleCodec.export(project.cues,vtt,bilingual); }
+    try { text=SubtitleCodec.export(project.cues,vtt,bilingual,originalOnly); }
     catch(AppException error){message=error.getUserMessage();publish();return;}
-    final boolean demo=project.demo;
+    final boolean demo=project.demo && !originalOnly;
     io.execute(() -> {
       String next;
       try(OutputStream output=context.getContentResolver().openOutputStream(destination,"wt")) {

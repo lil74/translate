@@ -12,6 +12,7 @@ import com.example.bilingualreader.ui.*;
 import com.example.bilingualreader.viewmodel.*;
 
 public final class ReaderFragment extends BaseFragment {
+  private int lastReadingPercent = -1;
   private ReaderViewModel vm;
   private RecyclerView list;
   private LinearLayoutManager layout;
@@ -315,17 +316,16 @@ public final class ReaderFragment extends BaseFragment {
         item -> {
           if (item.getItemId() == R.id.translate) {
             remember();
-            requestChapterTranslation();
+            chooseTranslationSource(false);
             return true;
           }
           if (item.getItemId() == R.id.cancel) {
             vm.cancel();
             return true;
           }
-          if(item.getItemId()==9912){chooseTranslationSource();return true;}
           if (item.getItemId() == R.id.retranslate) {
             remember();
-            requestChapterRetranslation();
+            chooseTranslationSource(true);
             return true;
           }
           return false;
@@ -338,72 +338,63 @@ public final class ReaderFragment extends BaseFragment {
     return popup;
   }
 
-  private void requestChapterTranslation() {
+  private void chooseTranslationSource(boolean restart) {
+    UiState<ReaderViewModel.Location> current = vm.location.getValue();
+    if (current == null || current.data == null || isTranslationActive()) return;
+    String chapterId = current.data.chapter.getChapterId();
     TranslationConfigStore config = graph().translationConfig;
-    if (config == null && !graph().demo) {
-      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-          .setTitle("翻译当前章节")
-          .setMessage("原文将发送到团队配置的在线翻译服务。是否继续？")
-          .setNegativeButton("暂不翻译", null)
-          .setPositiveButton("继续", (dialog, which) -> vm.translate(translationSource))
-          .show();
-    } else if (config != null && config.needsConsent()) {
-      String endpoint = config.endpoint();
-      new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-          .setTitle("发送本章原文用于翻译？")
-          .setMessage("本章英语原文会发送到：\n" + endpoint + "\n\n译文会保存在手机中。请确认你同意向该服务发送原文。")
-          .setNegativeButton("取消", null)
-          .setPositiveButton(
-              "同意并翻译",
-              (dialog, which) -> {
-                if (TranslationConfigStore.ONLINE.equals(config.mode())
-                    && endpoint.equals(config.endpoint())) {
-                  config.consent(endpoint);
-                  vm.translate(translationSource);
-                }
-              })
-          .show();
-    } else vm.translate(translationSource);
-  }
-  private void chooseTranslationSource(){
-    String[] labels={"英语 → 中文","韩语 → 中文","日语 → 中文"};String[] codes={"en","ko","ja"};
-    int checked=java.util.Arrays.asList(codes).indexOf(translationSource);
-    new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext()).setTitle("本书原文语言")
-        .setSingleChoiceItems(labels,Math.max(0,checked),(dialog,index)->{translationSource=codes[index];
-          requireContext().getSharedPreferences("reader_translation",0).edit().putString("source",translationSource).apply();dialog.dismiss();})
-        .setNegativeButton("取消",null).show();
-  }
+    String endpoint = config == null ? null : config.endpoint();
+    String mode = config == null ? null : config.mode();
+    boolean online = config == null ? !graph().demo : TranslationConfigStore.ONLINE.equals(mode);
 
-  private void requestChapterRetranslation() {
-    TranslationConfigStore config = graph().translationConfig;
-    UiState<ReaderViewModel.Location> location = vm.location.getValue();
-    if (config == null || location == null || location.data == null) return;
-    String chapter = location.data.chapter.getChapterId(),
-        endpoint = config.endpoint(),
-        mode = config.mode();
-    new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-        .setTitle(R.string.reader_retranslate_action)
-        .setMessage("将清除本章已有译文，并使用当前服务重新翻译。在线翻译会发送本章原文，可能产生新的调用费用。\n"+endpoint)
-        .setNegativeButton("取消",null)
-        .setPositiveButton(R.string.reader_retranslate_action,(dialog,which)->{
-          UiState<ReaderViewModel.Location> current=vm.location.getValue();
-          if(endpoint.equals(config.endpoint()) && mode.equals(config.mode())
-              && current!=null && current.data!=null && chapter.equals(current.data.chapter.getChapterId())) {
-            config.consent(endpoint);vm.retranslate(translationSource);
-          }
-        }).show();
+    String[] codes = {"en", "ko", "ja"};
+    String[] labels = {"英语 → 简体中文", "韩语 → 简体中文", "日语 → 简体中文"};
+    int[] selected = {Math.max(0, java.util.Arrays.asList(codes).indexOf(translationSource))};
+    com.google.android.material.dialog.MaterialAlertDialogBuilder dialog =
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(restart ? "重新翻译本章" : "选择原文语言")
+            .setSingleChoiceItems(labels, selected[0], (d, index) -> selected[0] = index)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认", (d, which) -> {
+              UiState<ReaderViewModel.Location> latest = vm.location.getValue();
+              if (latest == null || latest.data == null || isTranslationActive()
+                  || !chapterId.equals(latest.data.chapter.getChapterId())) return;
+              if (config != null && (!endpoint.equals(config.endpoint()) || !mode.equals(config.mode()))) {
+                Toast.makeText(requireContext(), "翻译服务已更改，请重新打开语言选择", Toast.LENGTH_SHORT).show();
+                return;
+              }
+              translationSource = codes[selected[0]];
+              requireContext().getSharedPreferences("reader_translation", 0).edit()
+                  .putString("source", translationSource).apply();
+              if (config != null && online) config.consent(endpoint);
+              if (restart) vm.retranslate(translationSource);
+              else vm.translate(translationSource);
+            });
+    if (online || restart) {
+      TextView note = new TextView(requireContext());
+      int padding = Math.round(24 * getResources().getDisplayMetrics().density);
+      note.setPadding(padding, padding / 2, padding, 0);
+      String message = online ? "本章原文将发送至" + (endpoint == null || endpoint.isEmpty()
+          ? "团队翻译服务。" : "\n" + endpoint) : "";
+      if (restart) message += (message.isEmpty() ? "" : "\n") + "本章已有译文将被替换。";
+      note.setText(message);
+      dialog.setView(note);
+    }
+    dialog.show();
   }
 
   private void populateTranslationMenu(Menu menu) {
     menu.clear();
     menu.add(0, R.id.task_status, 0, getTranslationStatus()).setEnabled(false);
-    menu.add(0,9912,1,"原文语言："+java.util.Arrays.asList("英语","韩语","日语").get(Math.max(0,java.util.Arrays.asList("en","ko","ja").indexOf(translationSource))));
     UiState<ReaderViewModel.Location> location = vm.location.getValue();
     UiState<String> command = vm.command.getValue();
     boolean busy = command != null && command.status == UiState.Status.LOADING;
-    menu.add(0, R.id.translate, 2, getTranslationAction())
-        .setEnabled(location != null && location.data != null && !isTranslationActive() && !busy);
-    if (isTranslationActive()) menu.add(0, R.id.cancel, 2, "取消任务").setEnabled(!busy);
+    if (isTranslationActive()) {
+      menu.add(0, R.id.cancel, 1, "取消翻译").setEnabled(!busy);
+    } else {
+      menu.add(0, R.id.translate, 1, getTranslationAction())
+          .setEnabled(location != null && location.data != null && !busy);
+    }
     TranslationTask task = vm.task.getValue();
     if (!isTranslationActive()
         && task != null
